@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Corn AI</string>
+    <string name="scan_now">Scan Sekarang</string>
+    <string name="scan_hint">Arahkan kamera ke daun atau tongkol jagung</string>
+    <string name="upload_from_gallery">Unggah dari Galeri</string>
+    <string name="recent_results">Hasil Terakhir</string>
+    <string name="scan_history">Riwayat Scan</string>
+    <string name="diagnosis_result">Hasil Diagnosis</string>
+    <string name="confidence">Tingkat Kepercayaan</string>
+    <string name="symptoms">Gejala</string>
+    <string name="treatment">Penanganan</string>
+    <string name="share_result">Bagikan</string>
+    <string name="scan_again">Scan Ulang</string>
+    <string name="healthy">Sehat</string>
+    <string name="disease_detected">Penyakit Terdeteksi</string>
+    <string name="camera_permission_required">Izinkan akses kamera untuk scan</string>
+    <string name="grant_permission">Berikan Izin</string>
+    <string name="no_history">Belum ada riwayat scan</string>
+    <string name="no_history_desc">Scan jagung Anda untuk melihat hasil di sini</string>
+    <string name="welcome_title">Deteksi Penyakit Jagung</string>
+    <string name="welcome_subtitle">dengan AI dalam genggaman Anda</string>
+</resources>
