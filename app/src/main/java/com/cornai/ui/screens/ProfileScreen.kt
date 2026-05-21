@@ -75,9 +75,20 @@ fun ProfileScreen(
             Spacer(modifier = Modifier.height(24.dp))
             AboutSection(onPrivacyClick = onPrivacyClick, onHelpClick = onHelpClick)
 
-            // Sign Out Button
-            if (!isGuest) {
-                Spacer(modifier = Modifier.height(16.dp))
+            // Sign Out Button / Login Button
+            Spacer(modifier = Modifier.height(16.dp))
+            if (isGuest) {
+                Button(
+                    onClick = onSignOut,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).height(56.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = GreenPrimary)
+                ) {
+                    Icon(Icons.Default.Login, contentDescription = null, modifier = Modifier.size(20.dp), tint = Color.White)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Login / Register", fontSize = 16.sp, fontWeight = FontWeight.Medium, color = Color.White)
+                }
+            } else {
                 OutlinedButton(
                     onClick = onSignOut,
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).height(56.dp),
