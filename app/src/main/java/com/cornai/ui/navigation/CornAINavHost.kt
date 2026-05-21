@@ -53,12 +53,6 @@ fun CornAINavHost(
     // Auth state for UI
     val authState by authViewModel.authState.collectAsState()
 
-    // Filter routes that need auth check
-    val effectiveStartDestination = when {
-        !hasSeenOnboarding -> Screen.Onboarding.route
-        !isLoggedIn -> Screen.Login.route
-        else -> Screen.Home.route
-    }
 
     Scaffold(
         bottomBar = {
@@ -82,7 +76,7 @@ fun CornAINavHost(
     ) { innerPadding: PaddingValues ->
         NavHost(
             navController = navController,
-            startDestination = effectiveStartDestination,
+            startDestination = Screen.Splash.route,
             modifier = Modifier.padding(innerPadding)
         ) {
             // ===== SPLASH =====
