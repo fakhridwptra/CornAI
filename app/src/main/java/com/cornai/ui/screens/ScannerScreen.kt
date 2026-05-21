@@ -3,7 +3,11 @@ package com.cornai.ui.screens
 import android.Manifest
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.ImageDecoder
+import android.graphics.Matrix
 import android.net.Uri
+import android.os.Build
+import android.provider.MediaStore
 import android.view.ViewGroup
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -27,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
@@ -34,6 +39,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
+import coil.compose.AsyncImage
 import com.cornai.ui.components.GradientButton
 import com.cornai.ui.components.ScanningIndicator
 import com.cornai.ui.theme.*
@@ -97,9 +104,14 @@ fun ScannerScreen(
                     uri = selectedImageUri!!,
                     isScanning = isScanning || isClassifying,
                     onScanStart = {
-                        isScanning = true
-                        simulateDetection(onResultReady) { scanning ->
-                            isScanning = scanning
+                        val bitmap = getBitmapFromUri(context, selectedImageUri!!)
+                        if (bitmap != null) {
+                            onClassify(bitmap)
+                        } else {
+                            isScanning = true
+                            simulateDetection(onResultReady) { scanning ->
+                                isScanning = scanning
+                            }
                         }
                     },
                     onBack = {
@@ -111,7 +123,10 @@ fun ScannerScreen(
             else -> {
                 CameraPreview(
                     isScanning = isScanning || isClassifying,
-                    onScanStart = {
+                    onScanStart = { bitmap ->
+                        onClassify(bitmap)
+                    },
+                    onScanFallback = {
                         isScanning = true
                         simulateDetection(onResultReady) { scanning ->
                             isScanning = scanning
@@ -155,7 +170,8 @@ private fun PermissionRequest(
 @Composable
 private fun CameraPreview(
     isScanning: Boolean,
-    onScanStart: () -> Unit,
+    onScanStart: (Bitmap) -> Unit,
+    onScanFallback: () -> Unit,
     onGalleryClick: () -> Unit,
     onBack: () -> Unit
 ) {
@@ -167,6 +183,9 @@ private fun CameraPreview(
     var cameraSelector by remember { mutableStateOf(CameraSelector.DEFAULT_BACK_CAMERA) }
     var isFlashEnabled by remember { mutableStateOf(false) }
     val previewView = remember { PreviewView(context) }
+
+    var isCapturing by remember { mutableStateOf(false) }
+    val showScanning = isScanning || isCapturing
 
     DisposableEffect(cameraSelector, isFlashEnabled) {
         val cameraProvider = cameraProviderFuture.get()
@@ -198,7 +217,7 @@ private fun CameraPreview(
         )
 
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            AnimatedScanningFrame(isScanning = isScanning)
+            AnimatedScanningFrame(isScanning = showScanning)
         }
 
         Row(
@@ -216,7 +235,7 @@ private fun CameraPreview(
             }
 
             Text(
-                text = if (isScanning) "Memindai..." else "Arahkan ke Daun/Tongkol",
+                text = if (showScanning) "Memindai..." else "Arahkan ke Daun/Tongkol",
                 color = Color.White,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Medium
@@ -243,19 +262,55 @@ private fun CameraPreview(
             modifier = Modifier.fillMaxWidth().align(Alignment.BottomCenter).padding(bottom = 48.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            if (!isScanning) {
+            if (!showScanning) {
                 Text("Posisikan daun atau tongkol jagung", color = Color.White.copy(alpha = 0.8f), fontSize = 14.sp, textAlign = TextAlign.Center)
                 Text("di dalam bingkai pemindaian", color = Color.White.copy(alpha = 0.8f), fontSize = 14.sp, textAlign = TextAlign.Center)
                 Spacer(modifier = Modifier.height(32.dp))
                 GradientButton(
                     text = "Mulai Pemindaian",
-                    onClick = onScanStart,
+                    onClick = {
+                        val capture = imageCapture
+                        if (capture != null) {
+                            isCapturing = true
+                            capture.takePicture(
+                                ContextCompat.getMainExecutor(context),
+                                object : ImageCapture.OnImageCapturedCallback() {
+                                    override fun onCaptureSuccess(image: ImageProxy) {
+                                        val rotationDegrees = image.imageInfo.rotationDegrees.toFloat()
+                                        val bitmap = try {
+                                            image.toBitmap().rotate(rotationDegrees)
+                                        } catch (e: Exception) {
+                                            null
+                                        }
+                                        image.close()
+                                        isCapturing = false
+                                        if (bitmap != null) {
+                                            onScanStart(bitmap)
+                                        } else {
+                                            onScanFallback()
+                                        }
+                                    }
+
+                                    override fun onError(exception: ImageCaptureException) {
+                                        isCapturing = false
+                                        onScanFallback()
+                                    }
+                                }
+                            )
+                        } else {
+                            onScanFallback()
+                        }
+                    },
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 48.dp),
                     icon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color.White) }
                 )
                 Spacer(modifier = Modifier.height(24.dp))
                 Row(
-                    modifier = Modifier.clip(RoundedCornerShape(16.dp)).padding(8.dp).background(Color.White.copy(alpha = 0.1f)).padding(horizontal = 24.dp, vertical = 8.dp),
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color.White.copy(alpha = 0.1f))
+                        .clickable { onGalleryClick() }
+                        .padding(horizontal = 24.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(Icons.Default.PhotoLibrary, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
@@ -310,8 +365,23 @@ private fun AnimatedScanningFrame(isScanning: Boolean) {
 @Composable
 private fun GalleryPreview(uri: Uri, isScanning: Boolean, onScanStart: () -> Unit, onBack: () -> Unit) {
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
-        Box(modifier = Modifier.fillMaxSize().background(GreenDark.copy(alpha = 0.3f)), contentAlignment = Alignment.Center) {
-            Icon(Icons.Default.Image, contentDescription = null, tint = Color.White.copy(alpha = 0.5f), modifier = Modifier.size(100.dp))
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            AsyncImage(
+                model = uri,
+                contentDescription = "Gallery Preview",
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Fit
+            )
+            if (isScanning) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.5f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    ScanningIndicator(size = 260.dp)
+                }
+            }
         }
 
         Row(
@@ -341,17 +411,39 @@ private fun GalleryPreview(uri: Uri, isScanning: Boolean, onScanStart: () -> Uni
     }
 }
 
+private fun getBitmapFromUri(context: Context, uri: Uri): Bitmap? {
+    return try {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            val source = ImageDecoder.createSource(context.contentResolver, uri)
+            ImageDecoder.decodeBitmap(source) { decoder, _, _ ->
+                decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+            }
+        } else {
+            @Suppress("DEPRECATION")
+            MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
+        }
+    } catch (e: Exception) {
+        e.printStackTrace()
+        null
+    }
+}
+
+private fun Bitmap.rotate(degrees: Float): Bitmap {
+    if (degrees == 0f) return this
+    val matrix = Matrix().apply { postRotate(degrees) }
+    return Bitmap.createBitmap(this, 0, 0, width, height, matrix, true)
+}
+
 private fun simulateDetection(
     onResultReady: (String, Float, Boolean) -> Unit,
     updateScanning: (Boolean) -> Unit
 ) {
     android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
         val results = listOf(
-            Triple("Common Rust", 0.89f, false),
-            Triple("Northern Leaf Blight", 0.94f, false),
+            Triple("Common_Rust", 0.89f, false),
+            Triple("Blight", 0.94f, false),
             Triple("Healthy_Daun", 0.97f, true),
-            Triple("Gray Leaf Spot", 0.91f, false),
-            Triple("Common_Rust", 0.92f, false),
+            Triple("Gray_Leaf_Spot", 0.91f, false),
             Triple("Healthy_Tongkol", 0.98f, true)
         )
         val result = results.random()

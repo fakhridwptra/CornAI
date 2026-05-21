@@ -187,6 +187,27 @@ fun CornAINavHost(
 
             // ===== SCANNER =====
             composable(Screen.Scanner.route) {
+                // Reset state when entering the Scanner screen
+                DisposableEffect(Unit) {
+                    scannerViewModel.resetState()
+                    onDispose {}
+                }
+
+                // Handle classification result
+                LaunchedEffect(scanState) {
+                    when (val state = scanState) {
+                        is UiState.Success -> {
+                            val result = state.data
+                            scannerViewModel.saveScanResult(result)
+                            navController.navigate(
+                                Screen.Result.createRoute(result.displayName, result.confidence, result.isHealthy)
+                            )
+                            scannerViewModel.resetState()
+                        }
+                        else -> {}
+                    }
+                }
+
                 ScannerScreen(
                     onResultReady = { diseaseName, confidence, isHealthy ->
                         navController.navigate(
@@ -194,6 +215,9 @@ fun CornAINavHost(
                         )
                     },
                     onBack = { navController.popBackStack() },
+                    onClassify = { bitmap ->
+                        scannerViewModel.classifyImage(bitmap)
+                    },
                     isClassifying = scanState is UiState.Loading
                 )
             }
