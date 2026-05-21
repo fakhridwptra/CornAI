@@ -208,13 +208,22 @@ fun CornAINavHost(
 
             // ===== HOME =====
             composable(Screen.Home.route) {
+                val homeUserName by homeViewModel.userName.collectAsState()
+                val homeTotalScans by homeViewModel.totalScans.collectAsState()
+                val homeHealthyScans by homeViewModel.healthyScans.collectAsState()
+                val homeDiseaseScans by homeViewModel.diseaseScans.collectAsState()
+
+                LaunchedEffect(Unit) {
+                    homeViewModel.loadData()
+                }
+
                 HomeScreen(
                     onScanClick = { navController.navigate(Screen.Scanner.route) },
                     onHistoryClick = { navController.navigate(Screen.History.route) },
-                    userName = homeViewModel.userName.value,
-                    totalScans = homeViewModel.totalScans.value,
-                    healthyScans = homeViewModel.healthyScans.value,
-                    diseaseScans = homeViewModel.diseaseScans.value,
+                    userName = homeUserName,
+                    totalScans = homeTotalScans,
+                    healthyScans = homeHealthyScans,
+                    diseaseScans = homeDiseaseScans,
                     isGuest = isGuest
                 )
             }
@@ -293,10 +302,18 @@ fun CornAINavHost(
 
             // ===== HISTORY =====
             composable(Screen.History.route) {
+                val historyList by historyViewModel.historyList.collectAsState()
+                val historyStats by historyViewModel.stats.collectAsState()
+                val historyIsLoading by historyViewModel.isLoading.collectAsState()
+
+                LaunchedEffect(Unit) {
+                    historyViewModel.loadHistory()
+                }
+
                 HistoryScreen(
                     onBack = { navController.popBackStack() },
                     onHistoryEnhancedClick = { navController.navigate(Screen.HistoryEnhanced.route) },
-                    historyList = historyViewModel.historyList.value.map { history ->
+                    historyList = historyList.map { history ->
                         ScanHistoryData(
                             id = history.id,
                             diseaseName = history.diseaseName,
@@ -309,16 +326,24 @@ fun CornAINavHost(
                         )
                     },
                     stats = HistoryStatsData(
-                        totalScans = historyViewModel.stats.value.totalScans,
-                        healthyCount = historyViewModel.stats.value.healthyCount,
-                        diseaseCount = historyViewModel.stats.value.diseaseCount
+                        totalScans = historyStats.totalScans,
+                        healthyCount = historyStats.healthyCount,
+                        diseaseCount = historyStats.diseaseCount
                     ),
-                    isLoading = historyViewModel.isLoading.value
+                    isLoading = historyIsLoading
                 )
             }
 
             // ===== PROFILE =====
             composable(Screen.Profile.route) {
+                val profileUserName by profileViewModel.userName.collectAsState()
+                val profileUserEmail by profileViewModel.userEmail.collectAsState()
+                val profileStats by profileViewModel.stats.collectAsState()
+
+                LaunchedEffect(Unit) {
+                    profileViewModel.loadStats()
+                }
+
                 ProfileScreen(
                     onBack = { navController.popBackStack() },
                     onHelpClick = { navController.navigate(Screen.HelpSupport.route) },
@@ -334,12 +359,12 @@ fun CornAINavHost(
                             popUpTo(0) { inclusive = true }
                         }
                     },
-                    userName = profileViewModel.userName.value,
-                    userEmail = profileViewModel.userEmail.value,
+                    userName = profileUserName,
+                    userEmail = profileUserEmail,
                     isGuest = isGuest,
-                    totalScans = profileViewModel.stats.value.first,
-                    healthyScans = profileViewModel.stats.value.second,
-                    diseaseScans = profileViewModel.stats.value.third
+                    totalScans = profileStats.first,
+                    healthyScans = profileStats.second,
+                    diseaseScans = profileStats.third
                 )
             }
 

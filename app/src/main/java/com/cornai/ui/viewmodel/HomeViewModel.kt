@@ -34,13 +34,16 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         loadData()
     }
 
-    private fun loadData() {
+    fun loadData() {
         viewModelScope.launch {
-            repository.getLocalHistoryFlow().collect { history ->
+            try {
+                val history = repository.getHistory()
                 _recentScans.value = history.take(3)
                 _totalScans.value = history.size
                 _healthyScans.value = history.count { it.isHealthy }
                 _diseaseScans.value = history.count { !it.isHealthy }
+            } catch (e: Exception) {
+                // Handle error
             }
         }
     }
