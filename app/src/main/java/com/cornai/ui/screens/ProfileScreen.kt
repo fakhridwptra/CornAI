@@ -8,6 +8,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Help
+import androidx.compose.material.icons.automirrored.filled.Login
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -54,7 +58,7 @@ fun ProfileScreen(
             TopAppBar(
                 title = { Text("Profil", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "Back") }
+                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
                 },
                 actions = {
                     IconButton(onClick = onSettingsClick) { Icon(Icons.Default.Settings, contentDescription = "Settings", tint = GreenPrimary) }
@@ -84,7 +88,7 @@ fun ProfileScreen(
                     shape = RoundedCornerShape(16.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = GreenPrimary)
                 ) {
-                    Icon(Icons.Default.Login, contentDescription = null, modifier = Modifier.size(20.dp), tint = Color.White)
+                    Icon(Icons.AutoMirrored.Filled.Login, contentDescription = null, modifier = Modifier.size(20.dp), tint = Color.White)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("Login / Register", fontSize = 16.sp, fontWeight = FontWeight.Medium, color = Color.White)
                 }
@@ -95,7 +99,7 @@ fun ProfileScreen(
                     shape = RoundedCornerShape(16.dp),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = Error)
                 ) {
-                    Icon(Icons.Default.Logout, contentDescription = null, modifier = Modifier.size(20.dp))
+                    Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("Keluar", fontSize = 16.sp, fontWeight = FontWeight.Medium)
                 }
@@ -245,7 +249,7 @@ private fun AboutSection(onPrivacyClick: () -> Unit, onHelpClick: () -> Unit) {
                 SimpleDivider(modifier = Modifier.padding(horizontal = 16.dp))
                 SettingsItem(icon = Icons.Default.Description, title = "Kebijakan Privasi", subtitle = "Baca kebijakan privasi kami", onClick = onPrivacyClick)
                 SimpleDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                SettingsItem(icon = Icons.Default.Help, title = "Bantuan", subtitle = "Panduan penggunaan app", onClick = onHelpClick)
+                SettingsItem(icon = Icons.AutoMirrored.Filled.Help, title = "Bantuan", subtitle = "Panduan penggunaan app", onClick = onHelpClick)
                 SimpleDivider(modifier = Modifier.padding(horizontal = 16.dp))
                 SettingsItem(icon = Icons.Default.Star, title = "Beri Rating", subtitle = "Dukung pengembangan kami")
             }
