@@ -66,7 +66,26 @@ interface ScanHistoryDao {
     suspend fun getDiseaseCount(userId: String): Int
 }
 
-@Database(entities = [ScanHistoryEntity::class], version = 1, exportSchema = false)
+@Entity(tableName = "users")
+data class UserEntity(
+    @PrimaryKey val email: String,
+    val name: String,
+    val phone: String,
+    val password: String,
+    val createdAt: Long = System.currentTimeMillis()
+)
+
+@Dao
+interface UserDao {
+    @Query("SELECT * FROM users WHERE email = :email LIMIT 1")
+    suspend fun getUserByEmail(email: String): UserEntity?
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertUser(user: UserEntity)
+}
+
+@Database(entities = [ScanHistoryEntity::class, UserEntity::class], version = 2, exportSchema = false)
 abstract class CornAIDatabase : RoomDatabase() {
     abstract fun scanHistoryDao(): ScanHistoryDao
+    abstract fun userDao(): UserDao
 }

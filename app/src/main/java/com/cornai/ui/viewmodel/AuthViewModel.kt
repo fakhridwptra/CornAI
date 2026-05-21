@@ -59,35 +59,42 @@ class AuthViewModel(
         viewModelScope.launch {
             _authState.value = UiState.Loading
             try {
-                // For demo mode, simulate sign in
-                val userId = "user_${System.currentTimeMillis()}"
-                preferencesManager.saveUserSession(
-                    userId = userId,
-                    userName = _loginEmail.value.substringBefore("@"),
-                    userEmail = _loginEmail.value,
-                    userPhoto = "",
-                    isGuest = false
-                )
-                _authState.value = UiState.Success(Unit)
+                val user = repository.authenticateUser(_loginEmail.value, _loginPassword.value)
+                if (user != null) {
+                    preferencesManager.saveUserSession(
+                        userId = user.email,
+                        userName = user.name,
+                        userEmail = user.email,
+                        userPhoto = "",
+                        isGuest = false
+                    )
+                    _authState.value = UiState.Success(Unit)
+                } else {
+                    _authState.value = UiState.Error("Email atau password salah")
+                }
             } catch (e: Exception) {
                 _authState.value = UiState.Error(e.message ?: "Login gagal")
             }
         }
     }
 
-    fun signUp(name: String, email: String, password: String) {
+    fun signUp(name: String, email: String, phone: String, password: String) {
         viewModelScope.launch {
             _authState.value = UiState.Loading
             try {
-                val userId = "user_${System.currentTimeMillis()}"
-                preferencesManager.saveUserSession(
-                    userId = userId,
-                    userName = name,
-                    userEmail = email,
-                    userPhoto = "",
-                    isGuest = false
-                )
-                _authState.value = UiState.Success(Unit)
+                val success = repository.registerUser(name, email, phone, password)
+                if (success) {
+                    preferencesManager.saveUserSession(
+                        userId = email,
+                        userName = name,
+                        userEmail = email,
+                        userPhoto = "",
+                        isGuest = false
+                    )
+                    _authState.value = UiState.Success(Unit)
+                } else {
+                    _authState.value = UiState.Error("Email sudah terdaftar")
+                }
             } catch (e: Exception) {
                 _authState.value = UiState.Error(e.message ?: "Registrasi gagal")
             }

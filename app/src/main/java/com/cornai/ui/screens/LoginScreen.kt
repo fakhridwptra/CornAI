@@ -32,7 +32,7 @@ fun LoginScreen(
     onGuestClick: () -> Unit = onLoginSuccess,
     isLoading: Boolean = false,
     errorMessage: String? = null,
-    onLoginClick: () -> Unit = onLoginSuccess,
+    onLoginClick: (String, String) -> Unit,
     onResetError: () -> Unit = {}
 ) {
     var email by remember { mutableStateOf("") }
@@ -167,7 +167,7 @@ fun LoginScreen(
                 if (email.isBlank() || password.isBlank()) {
                     // Will show error via errorMessage
                 } else {
-                    onLoginClick()
+                    onLoginClick(email, password)
                 }
             },
             modifier = Modifier.fillMaxWidth(),

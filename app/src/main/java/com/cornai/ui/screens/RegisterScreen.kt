@@ -25,8 +25,10 @@ import com.cornai.ui.theme.*
 @Composable
 fun RegisterScreen(
     onBack: () -> Unit,
-    onRegisterSuccess: () -> Unit,
-    onLoginClick: () -> Unit
+    onRegisterClick: (String, String, String, String) -> Unit,
+    onLoginClick: () -> Unit,
+    isLoading: Boolean = false,
+    errorMessage: String? = null
 ) {
     var name by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
@@ -34,9 +36,10 @@ fun RegisterScreen(
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
     var isPasswordVisible by remember { mutableStateOf(false) }
-    var isLoading by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var localErrorMessage by remember { mutableStateOf<String?>(null) }
     var agreedToTerms by remember { mutableStateOf(false) }
+
+    val displayError = localErrorMessage ?: errorMessage
 
     Column(
         modifier = Modifier
@@ -68,7 +71,7 @@ fun RegisterScreen(
         // Name Field
         OutlinedTextField(
             value = name,
-            onValueChange = { name = it; errorMessage = null },
+            onValueChange = { name = it; localErrorMessage = null },
             label = { Text("Nama Lengkap") },
             leadingIcon = {
                 Icon(Icons.Default.Person, contentDescription = null, tint = GreenPrimary)
@@ -87,7 +90,7 @@ fun RegisterScreen(
         // Email Field
         OutlinedTextField(
             value = email,
-            onValueChange = { email = it; errorMessage = null },
+            onValueChange = { email = it; localErrorMessage = null },
             label = { Text("Email") },
             leadingIcon = {
                 Icon(Icons.Default.Email, contentDescription = null, tint = GreenPrimary)
@@ -107,7 +110,7 @@ fun RegisterScreen(
         // Phone Field
         OutlinedTextField(
             value = phone,
-            onValueChange = { phone = it; errorMessage = null },
+            onValueChange = { phone = it; localErrorMessage = null },
             label = { Text("Nomor HP (opsional)") },
             leadingIcon = {
                 Icon(Icons.Default.Phone, contentDescription = null, tint = GreenPrimary)
@@ -127,7 +130,7 @@ fun RegisterScreen(
         // Password Field
         OutlinedTextField(
             value = password,
-            onValueChange = { password = it; errorMessage = null },
+            onValueChange = { password = it; localErrorMessage = null },
             label = { Text("Kata Sandi") },
             leadingIcon = {
                 Icon(Icons.Default.Lock, contentDescription = null, tint = GreenPrimary)
@@ -157,7 +160,7 @@ fun RegisterScreen(
         // Confirm Password Field
         OutlinedTextField(
             value = confirmPassword,
-            onValueChange = { confirmPassword = it; errorMessage = null },
+            onValueChange = { confirmPassword = it; localErrorMessage = null },
             label = { Text("Konfirmasi Kata Sandi") },
             leadingIcon = {
                 Icon(Icons.Default.Lock, contentDescription = null, tint = GreenPrimary)
@@ -184,7 +187,7 @@ fun RegisterScreen(
         }
 
         // Error Message
-        errorMessage?.let { error ->
+        displayError?.let { error ->
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = error,
@@ -231,24 +234,20 @@ fun RegisterScreen(
             onClick = {
                 when {
                     name.isBlank() || email.isBlank() || password.isBlank() -> {
-                        errorMessage = "Nama, email, dan kata sandi harus diisi"
+                        localErrorMessage = "Nama, email, dan kata sandi harus diisi"
                     }
                     password != confirmPassword -> {
-                        errorMessage = "Kata sandi tidak cocok"
+                        localErrorMessage = "Kata sandi tidak cocok"
                     }
                     password.length < 6 -> {
-                        errorMessage = "Kata sandi minimal 6 karakter"
+                        localErrorMessage = "Kata sandi minimal 6 karakter"
                     }
                     !agreedToTerms -> {
-                        errorMessage = "Anda harus menyetujui Syarat & Ketentuan"
+                        localErrorMessage = "Anda harus menyetujui Syarat & Ketentuan"
                     }
                     else -> {
-                        isLoading = true
-                        // Simulate registration
-                        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-                            isLoading = false
-                            onRegisterSuccess()
-                        }, 2000)
+                        localErrorMessage = null
+                        onRegisterClick(name, email, phone, password)
                     }
                 }
             },

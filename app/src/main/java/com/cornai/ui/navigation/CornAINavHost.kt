@@ -122,15 +122,30 @@ fun CornAINavHost(
                 }
                 val isLoading = authState is UiState.Loading
 
+                LaunchedEffect(authState) {
+                    if (authState is UiState.Success) {
+                        authViewModel.resetState()
+                        navController.navigate(Screen.Home.route) {
+                            popUpTo(Screen.Login.route) { inclusive = true }
+                        }
+                    }
+                }
+
                 LoginScreen(
-                    onBack = { navController.popBackStack() },
+                    onBack = { 
+                        authViewModel.resetState()
+                        navController.popBackStack() 
+                    },
                     onLoginSuccess = {
                         authViewModel.resetState()
                         navController.navigate(Screen.Home.route) {
                             popUpTo(Screen.Login.route) { inclusive = true }
                         }
                     },
-                    onRegisterClick = { navController.navigate(Screen.Register.route) },
+                    onRegisterClick = { 
+                        authViewModel.resetState()
+                        navController.navigate(Screen.Register.route) 
+                    },
                     onForgotPasswordClick = { navController.navigate(Screen.ForgotPassword.route) },
                     onGuestClick = {
                         authViewModel.signInAsGuest()
@@ -138,7 +153,11 @@ fun CornAINavHost(
                             popUpTo(Screen.Login.route) { inclusive = true }
                         }
                     },
-                    onLoginClick = { /* Login handled via ViewModel */ },
+                    onLoginClick = { email, password ->
+                        authViewModel.updateLoginEmail(email)
+                        authViewModel.updateLoginPassword(password)
+                        authViewModel.signIn()
+                    },
                     onResetError = { authViewModel.resetState() },
                     isLoading = isLoading,
                     errorMessage = errorMessage
@@ -147,14 +166,35 @@ fun CornAINavHost(
 
             // ===== REGISTER =====
             composable(Screen.Register.route) {
-                RegisterScreen(
-                    onBack = { navController.popBackStack() },
-                    onRegisterSuccess = {
+                val registerErrorMessage = when (authState) {
+                    is UiState.Error -> (authState as UiState.Error).message
+                    else -> null
+                }
+                val isRegisterLoading = authState is UiState.Loading
+
+                LaunchedEffect(authState) {
+                    if (authState is UiState.Success) {
+                        authViewModel.resetState()
                         navController.navigate(Screen.Home.route) {
                             popUpTo(Screen.Register.route) { inclusive = true }
                         }
+                    }
+                }
+
+                RegisterScreen(
+                    onBack = { 
+                        authViewModel.resetState()
+                        navController.popBackStack() 
                     },
-                    onLoginClick = { navController.popBackStack() }
+                    onRegisterClick = { name, email, phone, password ->
+                        authViewModel.signUp(name, email, phone, password)
+                    },
+                    onLoginClick = { 
+                        authViewModel.resetState()
+                        navController.popBackStack() 
+                    },
+                    isLoading = isRegisterLoading,
+                    errorMessage = registerErrorMessage
                 )
             }
 

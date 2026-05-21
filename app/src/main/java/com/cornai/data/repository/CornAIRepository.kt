@@ -31,6 +31,7 @@ class CornAIRepository(
         "cornai_database"
     ).fallbackToDestructiveMigration().build()
     private val scanHistoryDao = database.scanHistoryDao()
+    private val userDao = database.userDao()
     private val aiModel = CornAIModel(context)
 
     // Flows
@@ -55,6 +56,35 @@ class CornAIRepository(
             userEmail = email,
             isGuest = isGuest
         )
+    }
+
+    suspend fun registerUser(name: String, email: String, phone: String, password: String): Boolean {
+        return withContext(Dispatchers.IO) {
+            val existing = userDao.getUserByEmail(email)
+            if (existing != null) {
+                false
+            } else {
+                val user = com.cornai.data.local.UserEntity(
+                    email = email,
+                    name = name,
+                    phone = phone,
+                    password = password
+                )
+                userDao.insertUser(user)
+                true
+            }
+        }
+    }
+
+    suspend fun authenticateUser(email: String, password: String): com.cornai.data.local.UserEntity? {
+        return withContext(Dispatchers.IO) {
+            val user = userDao.getUserByEmail(email)
+            if (user != null && user.password == password) {
+                user
+            } else {
+                null
+            }
+        }
     }
 
     suspend fun clearSession() {
