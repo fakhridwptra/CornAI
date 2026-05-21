@@ -44,10 +44,7 @@ class CornAIRepository(
 
     suspend fun getCurrentUserId(): String {
         return preferencesManager.userId.first().ifEmpty {
-            // For demo, use device ID
-            val deviceId = "demo_${System.currentTimeMillis()}"
-            preferencesManager.saveUserSession(deviceId, "Demo User", "", "", true)
-            deviceId
+            "demo_temp"
         }
     }
 
