@@ -1,0 +1,10 @@
+Asphalt_stain
+Bacterial_Leaf_Streak
+Bipolaris
+Blight
+Common_Rust
+Gray_Leaf_Spot
+Healthy_Daun
+Healthy_Tongkol
+Stenocarpella
+Unhealthy_Tongkol

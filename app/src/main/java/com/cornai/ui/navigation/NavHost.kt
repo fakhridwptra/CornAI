@@ -5,21 +5,35 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.navArgument
+import com.cornai.data.model.UiState
 import com.cornai.ui.screens.*
+import com.cornai.ui.theme.*
+import com.cornai.ui.viewmodel.*
 
 @Composable
 fun CornAINavHost(
     navController: NavHostController,
     startDestination: String = Screen.Splash.route
 ) {
+    val authViewModel: AuthViewModel = viewModel()
+    val scannerViewModel: ScannerViewModel = viewModel()
+    val historyViewModel: HistoryViewModel = viewModel()
+    val homeViewModel: HomeViewModel = viewModel()
+    val profileViewModel: ProfileViewModel = viewModel()
+
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
+
+    val isLoggedIn by authViewModel.isLoggedIn.collectAsState()
+    val isGuest by authViewModel.isGuest.collectAsState()
+    val hasSeenOnboarding by authViewModel.hasSeenOnboarding.collectAsState()
 
     val showBottomBar = currentRoute in listOf(
         Screen.Home.route,
@@ -27,6 +41,12 @@ fun CornAINavHost(
         Screen.History.route,
         Screen.Profile.route
     )
+
+    // Auth state for login/register
+    val authState by authViewModel.authState.collectAsState()
+
+    // Scanner state
+    val scanState by scannerViewModel.scanState.collectAsState()
 
     Scaffold(
         bottomBar = {
@@ -53,19 +73,34 @@ fun CornAINavHost(
             startDestination = startDestination,
             modifier = Modifier.padding(innerPadding)
         ) {
+            // Splash Screen
             composable(Screen.Splash.route) {
                 SplashScreen(
                     onNavigateToHome = {
+                        navController.navigate(Screen.Home.route) {
+                            popUpTo(Screen.Splash.route) { inclusive = true }
+                        }
+                    },
+                    onNavigateToOnboarding = {
                         navController.navigate(Screen.Onboarding.route) {
                             popUpTo(Screen.Splash.route) { inclusive = true }
                         }
-                    }
+                    },
+                    onNavigateToLogin = {
+                        navController.navigate(Screen.Login.route) {
+                            popUpTo(Screen.Splash.route) { inclusive = true }
+                        }
+                    },
+                    isLoggedIn = isLoggedIn,
+                    hasSeenOnboarding = hasSeenOnboarding ?: false
                 )
             }
 
+            // Onboarding Screen
             composable(Screen.Onboarding.route) {
                 OnboardingScreen(
                     onFinish = {
+                        authViewModel.completeOnboarding()
                         navController.navigate(Screen.Login.route) {
                             popUpTo(Screen.Onboarding.route) { inclusive = true }
                         }
@@ -73,7 +108,11 @@ fun CornAINavHost(
                 )
             }
 
+            // Login Screen
             composable(Screen.Login.route) {
+                val errorMessage = if (authState is UiState.Error) (authState as UiState.Error).message else null
+                val isLoading = authState is UiState.Loading
+
                 LoginScreen(
                     onBack = { navController.popBackStack() },
                     onLoginSuccess = {
@@ -82,10 +121,21 @@ fun CornAINavHost(
                         }
                     },
                     onRegisterClick = { navController.navigate(Screen.Register.route) },
-                    onForgotPasswordClick = { navController.navigate(Screen.ForgotPassword.route) }
+                    onForgotPasswordClick = { navController.navigate(Screen.ForgotPassword.route) },
+                    onGuestClick = {
+                        authViewModel.signInAsGuest()
+                        navController.navigate(Screen.Home.route) {
+                            popUpTo(Screen.Login.route) { inclusive = true }
+                        }
+                    },
+                    onLoginClick = { /* Will be handled by ViewModel */ },
+                    onResetError = { authViewModel.resetState() },
+                    isLoading = isLoading,
+                    errorMessage = errorMessage
                 )
             }
 
+            // Register Screen
             composable(Screen.Register.route) {
                 RegisterScreen(
                     onBack = { navController.popBackStack() },
@@ -94,14 +144,11 @@ fun CornAINavHost(
                             popUpTo(Screen.Register.route) { inclusive = true }
                         }
                     },
-                    onLoginClick = {
-                        navController.navigate(Screen.Login.route) {
-                            popUpTo(Screen.Login.route) { inclusive = true }
-                        }
-                    }
+                    onLoginClick = { navController.popBackStack() }
                 )
             }
 
+            // Forgot Password Screen
             composable(Screen.ForgotPassword.route) {
                 ForgotPasswordScreen(
                     onBack = { navController.popBackStack() },
@@ -109,13 +156,20 @@ fun CornAINavHost(
                 )
             }
 
+            // Home Screen
             composable(Screen.Home.route) {
                 HomeScreen(
                     onScanClick = { navController.navigate(Screen.Scanner.route) },
-                    onHistoryClick = { navController.navigate(Screen.History.route) }
+                    onHistoryClick = { navController.navigate(Screen.History.route) },
+                    userName = homeViewModel.userName.value,
+                    totalScans = homeViewModel.totalScans.value,
+                    healthyScans = homeViewModel.healthyScans.value,
+                    diseaseScans = homeViewModel.diseaseScans.value,
+                    isGuest = isGuest
                 )
             }
 
+            // Scanner Screen
             composable(Screen.Scanner.route) {
                 ScannerScreen(
                     onResultReady = { diseaseName, confidence, isHealthy ->
@@ -123,10 +177,12 @@ fun CornAINavHost(
                             Screen.Result.createRoute(diseaseName, confidence, isHealthy)
                         )
                     },
-                    onBack = { navController.popBackStack() }
+                    onBack = { navController.popBackStack() },
+                    isClassifying = scanState is UiState.Loading
                 )
             }
 
+            // Result Screen
             composable(
                 route = Screen.Result.route,
                 arguments = listOf(
@@ -152,26 +208,62 @@ fun CornAINavHost(
                         navController.navigate(Screen.Home.route) {
                             popUpTo(Screen.Home.route) { inclusive = true }
                         }
+                    },
+                    onViewDetail = {
+                        navController.navigate(
+                            Screen.ResultDetail.createRoute(diseaseName, confidence, isHealthy)
+                        )
                     }
                 )
             }
 
+            // History Screen
             composable(Screen.History.route) {
                 HistoryScreen(
-                    onBack = { navController.popBackStack() }
+                    onBack = { navController.popBackStack() },
+                    onHistoryEnhancedClick = { navController.navigate(Screen.HistoryEnhanced.route) },
+                    historyList = historyViewModel.historyList.value.map { history ->
+                        ScanHistoryData(
+                            id = history.id,
+                            diseaseName = history.diseaseName,
+                            displayName = history.displayName,
+                            confidence = history.confidence,
+                            isHealthy = history.isHealthy,
+                            timestamp = history.timestamp,
+                            symptoms = history.symptoms,
+                            treatment = history.treatment
+                        )
+                    },
+                    stats = HistoryStatsData(
+                        totalScans = historyViewModel.stats.value.totalScans,
+                        healthyCount = historyViewModel.stats.value.healthyCount,
+                        diseaseCount = historyViewModel.stats.value.diseaseCount
+                    ),
+                    isLoading = historyViewModel.isLoading.value
                 )
             }
 
+            // Profile Screen
             composable(Screen.Profile.route) {
                 ProfileScreen(
                     onBack = { navController.popBackStack() },
-                    onHelpClick = { navController.navigate(Screen.Help.route) },
+                    onHelpClick = { navController.navigate(Screen.HelpSupport.route) },
                     onPrivacyClick = { navController.navigate(Screen.PrivacyPolicy.route) },
                     onEditClick = { navController.navigate(Screen.ProfileEdit.route) },
-                    onNotificationSettingsClick = { navController.navigate(Screen.NotificationSettings.route) }
+                    onNotificationSettingsClick = { navController.navigate(Screen.NotificationSettings.route) },
+                    onSettingsClick = { navController.navigate(Screen.Settings.route) },
+                    onProfileEnhancedClick = { navController.navigate(Screen.ProfileEnhanced.route) },
+                    onHistoryEnhancedClick = { navController.navigate(Screen.HistoryEnhanced.route) },
+                    userName = profileViewModel.userName.value,
+                    userEmail = profileViewModel.userEmail.value,
+                    isGuest = isGuest,
+                    totalScans = profileViewModel.stats.value.first,
+                    healthyScans = profileViewModel.stats.value.second,
+                    diseaseScans = profileViewModel.stats.value.third
                 )
             }
 
+            // Profile Edit Screen
             composable(Screen.ProfileEdit.route) {
                 ProfileEditScreen(
                     onBack = { navController.popBackStack() },
@@ -179,20 +271,96 @@ fun CornAINavHost(
                 )
             }
 
+            // Notification Settings Screen
             composable(Screen.NotificationSettings.route) {
                 NotificationSettingsScreen(
                     onBack = { navController.popBackStack() }
                 )
             }
 
-            composable(Screen.Help.route) {
+            // Help & Support Screen
+            composable(Screen.HelpSupport.route) {
                 HelpSupportScreen(
                     onBack = { navController.popBackStack() }
                 )
             }
 
+            // Privacy Policy Screen
             composable(Screen.PrivacyPolicy.route) {
                 PrivacyPolicyScreen(
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            // Welcome Screen
+            composable(Screen.Welcome.route) {
+                WelcomeScreen(
+                    onGetStarted = {
+                        navController.navigate(Screen.Onboarding.route) {
+                            popUpTo(Screen.Welcome.route) { inclusive = true }
+                        }
+                    }
+                )
+            }
+
+            // Settings Screen
+            composable(Screen.Settings.route) {
+                SettingsScreen(
+                    onBack = { navController.popBackStack() },
+                    onPrivacyClick = { navController.navigate(Screen.PrivacyPolicy.route) },
+                    onDarkModeToggle = { /* Handle dark mode */ }
+                )
+            }
+
+            // Result Detail Screen
+            composable(
+                route = Screen.ResultDetail.route,
+                arguments = listOf(
+                    navArgument("diseaseName") { type = NavType.StringType },
+                    navArgument("confidence") { type = NavType.FloatType },
+                    navArgument("isHealthy") { type = NavType.BoolType }
+                )
+            ) { backStackEntry ->
+                val diseaseName = backStackEntry.arguments?.getString("diseaseName") ?: ""
+                val confidence = backStackEntry.arguments?.getFloat("confidence") ?: 0f
+                val isHealthy = backStackEntry.arguments?.getBoolean("isHealthy") ?: true
+
+                ResultDetailScreen(
+                    diseaseName = diseaseName,
+                    confidence = confidence,
+                    isHealthy = isHealthy,
+                    symptoms = listOf("Gejala 1", "Gejala 2"),
+                    treatment = "Penanganan yang disarankan",
+                    severity = "Sedang",
+                    recoveryTime = "2-3 Minggu",
+                    onBack = { navController.popBackStack() },
+                    onScanAgain = {
+                        navController.navigate(Screen.Scanner.route) {
+                            popUpTo(Screen.Home.route)
+                        }
+                    },
+                    onShare = { }
+                )
+            }
+
+            // Profile Enhanced Screen
+            composable(Screen.ProfileEnhanced.route) {
+                ProfileEnhancedScreen(
+                    onBack = { navController.popBackStack() },
+                    onEditProfile = { navController.navigate(Screen.ProfileEdit.route) }
+                )
+            }
+
+            // History Enhanced Screen
+            composable(Screen.HistoryEnhanced.route) {
+                HistoryEnhancedScreen(
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            // Help Screen
+            composable(Screen.Help.route) {
+                HelpSupportScreen(
                     onBack = { navController.popBackStack() }
                 )
             }

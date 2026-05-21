@@ -1,7 +1,5 @@
 package com.cornai.ui.screens
 
-import android.os.Handler
-import android.os.Looper
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -19,15 +17,23 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cornai.ui.theme.*
+import kotlinx.coroutines.delay
 
 @Composable
 fun SplashScreen(
-    onNavigateToHome: () -> Unit
+    onNavigateToHome: () -> Unit,
+    onNavigateToOnboarding: () -> Unit,
+    onNavigateToLogin: () -> Unit = { onNavigateToHome() },
+    isLoggedIn: Boolean = false,
+    hasSeenOnboarding: Boolean = true
 ) {
     LaunchedEffect(Unit) {
-        Handler(Looper.getMainLooper()).postDelayed({
-            onNavigateToHome()
-        }, 3000)
+        delay(2500)
+        when {
+            !hasSeenOnboarding -> onNavigateToOnboarding()
+            !isLoggedIn -> onNavigateToLogin()
+            else -> onNavigateToHome()
+        }
     }
 
     Box(
@@ -45,7 +51,6 @@ fun SplashScreen(
             verticalArrangement = Arrangement.Center,
             modifier = Modifier.padding(32.dp)
         ) {
-            // Animated Logo
             val infiniteTransition = rememberInfiniteTransition(label = "splash")
 
             val scale by infiniteTransition.animateFloat(
@@ -69,19 +74,15 @@ fun SplashScreen(
             )
 
             Box(
-                modifier = Modifier
-                    .size(160.dp),
+                modifier = Modifier.size(160.dp),
                 contentAlignment = Alignment.Center
             ) {
-                // Glow effect
                 Box(
                     modifier = Modifier
                         .size(160.dp)
                         .clip(CircleShape)
                         .background(Color.White.copy(alpha = glowAlpha * 0.2f))
                 )
-
-                // Icon
                 Icon(
                     imageVector = Icons.Default.Agriculture,
                     contentDescription = "Corn AI Logo",
@@ -112,10 +113,7 @@ fun SplashScreen(
 
             Spacer(modifier = Modifier.height(48.dp))
 
-            // Loading dots
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 repeat(3) { index ->
                     val dotAlpha by infiniteTransition.animateFloat(
                         initialValue = 0.3f,
@@ -127,7 +125,6 @@ fun SplashScreen(
                         ),
                         label = "dot$index"
                     )
-
                     Box(
                         modifier = Modifier
                             .size(10.dp)

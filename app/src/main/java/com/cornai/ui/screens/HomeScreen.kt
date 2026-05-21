@@ -34,7 +34,12 @@ data class QuickFeature(
 @Composable
 fun HomeScreen(
     onScanClick: () -> Unit,
-    onHistoryClick: () -> Unit
+    onHistoryClick: () -> Unit,
+    userName: String = "Guest",
+    totalScans: Int = 0,
+    healthyScans: Int = 0,
+    diseaseScans: Int = 0,
+    isGuest: Boolean = false
 ) {
     val scrollState = rememberScrollState()
     val infiniteTransition = rememberInfiniteTransition(label = "home")
@@ -60,24 +65,27 @@ fun HomeScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        text = "Corn AI",
-                        fontWeight = FontWeight.Bold,
-                        color = GreenPrimary
-                    )
+                    Column {
+                        Text(
+                            text = "Corn AI",
+                            fontWeight = FontWeight.Bold,
+                            color = GreenPrimary
+                        )
+                        if (isGuest) {
+                            Text(
+                                text = "Mode Tamu",
+                                fontSize = 10.sp,
+                                color = TextSecondary
+                            )
+                        }
+                    }
                 },
                 actions = {
                     IconButton(onClick = onHistoryClick) {
-                        Icon(
-                            imageVector = Icons.Default.History,
-                            contentDescription = "History",
-                            tint = GreenPrimary
-                        )
+                        Icon(Icons.Default.History, contentDescription = "History", tint = GreenPrimary)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent
-                )
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
             )
         }
     ) { padding ->
@@ -88,176 +96,118 @@ fun HomeScreen(
                 .verticalScroll(scrollState),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Weather Widget
             WeatherWidget()
-
-            // Hero Section
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                GreenDark.copy(alpha = 0.08f),
-                                Background
-                            )
-                        )
-                    )
-                    .padding(vertical = 24.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    // Animated Corn Icon
-                    Box(
-                        modifier = Modifier
-                            .size(140.dp)
-                            .scale(pulseScale),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(140.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    Brush.radialGradient(
-                                        colors = listOf(
-                                            GreenPrimary.copy(alpha = 0.2f),
-                                            GreenPrimary.copy(alpha = 0f)
-                                        )
-                                    )
-                                )
-                        )
-                        CornIcon(
-                            size = 100.dp,
-                            primaryColor = GreenPrimary,
-                            accentColor = GoldPrimary
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(20.dp))
-
-                    Text(
-                        text = "Deteksi Penyakit Jagung",
-                        fontSize = 26.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimary,
-                        textAlign = TextAlign.Center
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Text(
-                        text = "Dengan AI dalam genggaman Anda",
-                        fontSize = 16.sp,
-                        color = TextSecondary,
-                        textAlign = TextAlign.Center
-                    )
-                }
-            }
-
-            // Tips Card
+            HeroSection(pulseScale = pulseScale)
             DailyTipsCard()
 
-            // Scan Button - Main CTA
+            // Stats summary if has scans
+            if (totalScans > 0) {
+                Spacer(modifier = Modifier.height(16.dp))
+                HomeStatsRow(total = totalScans, healthy = healthyScans, disease = diseaseScans)
+            }
+
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp)
+                    .padding(horizontal = 24.dp, vertical = 16.dp)
             ) {
                 GradientButton(
                     text = "Mulai Scan Sekarang",
                     onClick = onScanClick,
                     modifier = Modifier.fillMaxWidth(),
-                    icon = {
-                        Icon(
-                            imageVector = Icons.Default.CameraAlt,
-                            contentDescription = null,
-                            tint = Color.White
-                        )
-                    }
+                    icon = { Icon(Icons.Default.CameraAlt, contentDescription = null, tint = Color.White) }
                 )
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Quick Actions
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 24.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                QuickActionCard(
-                    icon = Icons.Default.CameraAlt,
-                    title = "Kamera",
-                    onClick = onScanClick,
-                    modifier = Modifier.weight(1f)
-                )
-                QuickActionCard(
-                    icon = Icons.Default.PhotoLibrary,
-                    title = "Galeri",
-                    onClick = { /* TODO: Gallery picker */ },
-                    modifier = Modifier.weight(1f)
-                )
+                QuickActionCard(icon = Icons.Default.CameraAlt, title = "Kamera", onClick = onScanClick, modifier = Modifier.weight(1f))
+                QuickActionCard(icon = Icons.Default.PhotoLibrary, title = "Galeri", onClick = { }, modifier = Modifier.weight(1f))
             }
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Info Cards Section
-            Column(
-                modifier = Modifier.padding(horizontal = 24.dp)
-            ) {
+            Column(modifier = Modifier.padding(horizontal = 24.dp)) {
                 SectionHeader(title = "Apa yang Bisa Dilakukan?")
-
                 Spacer(modifier = Modifier.height(16.dp))
-
-                InfoCard(
-                    icon = Icons.Default.Search,
-                    title = "Deteksi Cepat",
-                    description = "Identifikasi penyakit dalam hitungan detik menggunakan kamera"
-                )
-
+                InfoCard(icon = Icons.Default.Search, title = "Deteksi Cepat", description = "Identifikasi penyakit dalam hitungan detik menggunakan kamera")
                 Spacer(modifier = Modifier.height(12.dp))
-
-                InfoCard(
-                    icon = Icons.Default.Healing,
-                    title = "Rekomendasi Penanganan",
-                    description = "Dapatkan solusi dan rekomendasi penanganan yang tepat"
-                )
-
+                InfoCard(icon = Icons.Default.Healing, title = "Rekomendasi Penanganan", description = "Dapatkan solusi dan rekomendasi penanganan yang tepat")
                 Spacer(modifier = Modifier.height(12.dp))
-
-                InfoCard(
-                    icon = Icons.Default.OfflineBolt,
-                    title = "Offline Mode",
-                    description = "Bekerja tanpa koneksi internet, cocok untuk daerah pedesaan"
-                )
-
+                InfoCard(icon = Icons.Default.OfflineBolt, title = "Offline Mode", description = "Bekerja tanpa koneksi internet, cocok untuk daerah pedesaan")
                 Spacer(modifier = Modifier.height(12.dp))
-
-                InfoCard(
-                    icon = Icons.Default.Summarize,
-                    title = "Riwayat Scan",
-                    description = "Simpan dan lihat kembali hasil deteksi sebelumnya"
-                )
+                InfoCard(icon = Icons.Default.Summarize, title = "Riwayat Scan", description = "Simpan dan lihat kembali hasil deteksi sebelumnya")
             }
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Disease Classes Preview
-            Column(
-                modifier = Modifier.padding(horizontal = 24.dp)
-            ) {
+            Column(modifier = Modifier.padding(horizontal = 24.dp)) {
                 SectionHeader(title = "Kelas Deteksi")
-
                 Spacer(modifier = Modifier.height(16.dp))
-
                 DiseaseClassGrid()
             }
 
-            Spacer(modifier = Modifier.height(100.dp)) // Bottom nav spacing
+            Spacer(modifier = Modifier.height(100.dp))
+        }
+    }
+}
+
+@Composable
+private fun HomeStatsRow(total: Int, healthy: Int, disease: Int) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Surface)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(text = "$total", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = GreenPrimary)
+                Text(text = "Total", fontSize = 11.sp, color = TextSecondary)
+            }
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(text = "$healthy", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Success)
+                Text(text = "Sehat", fontSize = 11.sp, color = TextSecondary)
+            }
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(text = "$disease", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Error)
+                Text(text = "Penyakit", fontSize = 11.sp, color = TextSecondary)
+            }
+        }
+    }
+}
+
+@Composable
+private fun HeroSection(pulseScale: Float) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Brush.verticalGradient(colors = listOf(GreenDark.copy(alpha = 0.08f), Background)))
+            .padding(vertical = 24.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Box(
+                modifier = Modifier.size(140.dp).scale(pulseScale),
+                contentAlignment = Alignment.Center
+            ) {
+                Box(modifier = Modifier.size(140.dp).clip(CircleShape).background(Brush.radialGradient(colors = listOf(GreenPrimary.copy(alpha = 0.2f), GreenPrimary.copy(alpha = 0f)))))
+                CornIcon(size = 100.dp, primaryColor = GreenPrimary, accentColor = GoldPrimary)
+            }
+            Spacer(modifier = Modifier.height(20.dp))
+            Text("Deteksi Penyakit Jagung", fontSize = 26.sp, fontWeight = FontWeight.Bold, color = TextPrimary, textAlign = TextAlign.Center)
+            Spacer(modifier = Modifier.height(8.dp))
+            Text("Dengan AI dalam genggaman Anda", fontSize = 16.sp, color = TextSecondary, textAlign = TextAlign.Center)
         }
     }
 }
@@ -265,68 +215,24 @@ fun HomeScreen(
 @Composable
 private fun WeatherWidget() {
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 8.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = Surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Weather Icon
-            Box(
-                modifier = Modifier
-                    .size(56.dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(Color(0xFF87CEEB).copy(alpha = 0.2f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.WbSunny,
-                    contentDescription = null,
-                    tint = Color(0xFFFFB300),
-                    modifier = Modifier.size(32.dp)
-                )
+        Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(modifier = Modifier.size(56.dp).clip(RoundedCornerShape(16.dp)).background(Color(0xFF87CEEB).copy(alpha = 0.2f)), contentAlignment = Alignment.Center) {
+                Icon(Icons.Default.WbSunny, contentDescription = null, tint = Color(0xFFFFB300), modifier = Modifier.size(32.dp))
             }
-
             Spacer(modifier = Modifier.width(16.dp))
-
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Cuaca Hari Ini",
-                    fontSize = 12.sp,
-                    color = TextSecondary
-                )
-                Text(
-                    text = "Cerah, 32°C",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TextPrimary
-                )
-                Text(
-                    text = "Idealnya untuk menyemrot pestisida",
-                    fontSize = 12.sp,
-                    color = TextSecondary
-                )
+                Text("Cuaca Hari Ini", fontSize = 12.sp, color = TextSecondary)
+                Text("Cerah, 32°C", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                Text("Idealnya untuk menyemrot pestisida", fontSize = 12.sp, color = TextSecondary)
             }
-
-            Column(
-                horizontalAlignment = Alignment.End
-            ) {
-                Text(
-                    text = "🌤️",
-                    fontSize = 24.sp
-                )
-                Text(
-                    text = "Siang",
-                    fontSize = 11.sp,
-                    color = TextSecondary
-                )
+            Column(horizontalAlignment = Alignment.End) {
+                Text("🌤️", fontSize = 24.sp)
+                Text("Siang", fontSize = 11.sp, color = TextSecondary)
             }
         }
     }
@@ -334,58 +240,24 @@ private fun WeatherWidget() {
 
 @Composable
 private fun DailyTipsCard() {
-    val tips = listOf(
-        "Pastikan daun jagung kering sebelum melakukan scan untuk hasil terbaik",
-        "Scan dilakukan pada pagi atau sore hari dengan pencahayaan alami",
-        "Periksa tanaman secara rutin untuk deteksi dini penyakit"
-    )
+    val tips = listOf("Pastikan daun jagung kering sebelum melakukan scan untuk hasil terbaik", "Scan dilakukan pada pagi atau sore hari dengan pencahayaan alami", "Periksa tanaman secara rutin untuk deteksi dini penyakit")
     var currentTip by remember { mutableStateOf(tips.random()) }
 
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 8.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = GoldPrimary.copy(alpha = 0.1f)),
         border = BorderStroke(1.dp, GoldPrimary.copy(alpha = 0.3f))
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .background(GoldPrimary.copy(alpha = 0.2f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Lightbulb,
-                    contentDescription = null,
-                    tint = GoldDark,
-                    modifier = Modifier.size(24.dp)
-                )
+        Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(modifier = Modifier.size(44.dp).clip(CircleShape).background(GoldPrimary.copy(alpha = 0.2f)), contentAlignment = Alignment.Center) {
+                Icon(Icons.Default.Lightbulb, contentDescription = null, tint = GoldDark, modifier = Modifier.size(24.dp))
             }
-
             Spacer(modifier = Modifier.width(12.dp))
-
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "💡 Tips Hari Ini",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = GoldDark
-                )
+                Text("💡 Tips Hari Ini", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = GoldDark)
                 Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = currentTip,
-                    fontSize = 13.sp,
-                    color = TextPrimary,
-                    lineHeight = 18.sp
-                )
+                Text(currentTip, fontSize = 13.sp, color = TextPrimary, lineHeight = 18.sp)
             }
         }
     }
@@ -393,106 +265,35 @@ private fun DailyTipsCard() {
 
 @Composable
 private fun SectionHeader(title: String) {
-    Text(
-        text = title,
-        fontSize = 18.sp,
-        fontWeight = FontWeight.SemiBold,
-        color = TextPrimary
-    )
+    Text(text = title, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun QuickActionCard(
-    icon: ImageVector,
-    title: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        modifier = modifier,
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        onClick = onClick
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .background(GreenPrimary.copy(alpha = 0.1f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = GreenPrimary,
-                    modifier = Modifier.size(24.dp)
-                )
+private fun QuickActionCard(icon: ImageVector, title: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Card(modifier = modifier, shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Surface), elevation = CardDefaults.cardElevation(defaultElevation = 2.dp), onClick = onClick) {
+        Column(modifier = Modifier.fillMaxWidth().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Box(modifier = Modifier.size(48.dp).clip(CircleShape).background(GreenPrimary.copy(alpha = 0.1f)), contentAlignment = Alignment.Center) {
+                Icon(icon, contentDescription = null, tint = GreenPrimary, modifier = Modifier.size(24.dp))
             }
             Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = title,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium,
-                color = TextPrimary
-            )
+            Text(title, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = TextPrimary)
         }
     }
 }
 
 @Composable
-private fun InfoCard(
-    icon: ImageVector,
-    title: String,
-    description: String
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .background(GreenPrimary.copy(alpha = 0.1f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = GreenPrimary,
-                    modifier = Modifier.size(22.dp)
-                )
+private fun InfoCard(icon: ImageVector, title: String, description: String) {
+    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Surface), elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)) {
+        Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(modifier = Modifier.size(44.dp).clip(CircleShape).background(GreenPrimary.copy(alpha = 0.1f)), contentAlignment = Alignment.Center) {
+                Icon(icon, contentDescription = null, tint = GreenPrimary, modifier = Modifier.size(22.dp))
             }
             Spacer(modifier = Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = TextPrimary
-                )
+                Text(title, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
                 Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = description,
-                    fontSize = 13.sp,
-                    color = TextSecondary
-                )
+                Text(description, fontSize = 13.sp, color = TextSecondary)
             }
         }
     }
@@ -500,27 +301,14 @@ private fun InfoCard(
 
 @Composable
 private fun DiseaseClassGrid() {
-    val classes = listOf(
-        "Common Rust", "Northern Leaf Blight", "Gray Leaf Spot",
-        "Common Smut", "Healthy Leaf", "Healthy Cob",
-        "Asphalt Stain", "Cob Rot", "Eyespot", "Maize Streak"
-    )
-
+    val classes = listOf("Common Rust", "Northern Leaf Blight", "Gray Leaf Spot", "Common Smut", "Healthy Leaf", "Healthy Cob", "Asphalt Stain", "Cob Rot", "Eyespot", "Maize Streak")
     Column {
         classes.chunked(2).forEach { rowClasses ->
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 rowClasses.forEach { className ->
-                    ClassChip(
-                        name = className,
-                        modifier = Modifier.weight(1f)
-                    )
+                    ClassChip(name = className, modifier = Modifier.weight(1f))
                 }
-                if (rowClasses.size == 1) {
-                    Spacer(modifier = Modifier.weight(1f))
-                }
+                if (rowClasses.size == 1) Spacer(modifier = Modifier.weight(1f))
             }
             Spacer(modifier = Modifier.height(8.dp))
         }
@@ -530,24 +318,9 @@ private fun DiseaseClassGrid() {
 @Composable
 private fun ClassChip(name: String, modifier: Modifier = Modifier) {
     val isHealthy = name.contains("Healthy")
-    val backgroundColor = if (isHealthy) {
-        GreenPrimary.copy(alpha = 0.1f)
-    } else {
-        Error.copy(alpha = 0.1f)
-    }
+    val backgroundColor = if (isHealthy) GreenPrimary.copy(alpha = 0.1f) else Error.copy(alpha = 0.1f)
     val textColor = if (isHealthy) GreenPrimary else Error
-
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(backgroundColor)
-            .padding(horizontal = 12.dp, vertical = 8.dp)
-    ) {
-        Text(
-            text = name,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Medium,
-            color = textColor
-        )
+    Box(modifier = modifier.clip(RoundedCornerShape(12.dp)).background(backgroundColor).padding(horizontal = 12.dp, vertical = 8.dp)) {
+        Text(name, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = textColor)
     }
 }

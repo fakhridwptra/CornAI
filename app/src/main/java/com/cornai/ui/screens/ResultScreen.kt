@@ -55,7 +55,8 @@ fun ResultScreen(
     confidence: Float,
     isHealthy: Boolean,
     onScanAgain: () -> Unit,
-    onBackToHome: () -> Unit
+    onBackToHome: () -> Unit,
+    onViewDetail: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val scrollState = rememberScrollState()
@@ -124,7 +125,8 @@ fun ResultScreen(
             // Action Buttons
             ActionButtonsSection(
                 onScanAgain = onScanAgain,
-                onBackToHome = onBackToHome
+                onBackToHome = onBackToHome,
+                onViewDetail = onViewDetail
             )
 
             Spacer(modifier = Modifier.height(32.dp))
@@ -635,7 +637,8 @@ private fun TreatmentStepItem(step: TreatmentStep) {
 @Composable
 private fun ActionButtonsSection(
     onScanAgain: () -> Unit,
-    onBackToHome: () -> Unit
+    onBackToHome: () -> Unit,
+    onViewDetail: () -> Unit = {}
 ) {
     Column(
         modifier = Modifier.padding(horizontal = 20.dp)
@@ -652,6 +655,33 @@ private fun ActionButtonsSection(
                 )
             }
         )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Detail Button
+        OutlinedButton(
+            onClick = onViewDetail,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = ButtonDefaults.outlinedButtonColors(
+                containerColor = GreenPrimary.copy(alpha = 0.1f),
+                contentColor = GreenPrimary
+            )
+        ) {
+            Icon(
+                imageVector = Icons.Default.Info,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "Lihat Detail Lengkap",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium
+            )
+        }
 
         Spacer(modifier = Modifier.height(12.dp))
 

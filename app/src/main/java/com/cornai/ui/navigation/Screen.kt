@@ -19,7 +19,11 @@ sealed class Screen(val route: String) {
     object NotificationSettings : Screen("notification_settings")
     object Welcome : Screen("welcome")
     object Settings : Screen("settings")
-    object ResultDetail : Screen("result_detail")
+    object ResultDetail : Screen("result_detail/{diseaseName}/{confidence}/{isHealthy}") {
+        fun createRoute(diseaseName: String, confidence: Float, isHealthy: Boolean): String {
+            return "result_detail/$diseaseName/$confidence/$isHealthy"
+        }
+    }
     object ProfileEnhanced : Screen("profile_enhanced")
     object HelpSupport : Screen("help_support")
     object HistoryEnhanced : Screen("history_enhanced")
