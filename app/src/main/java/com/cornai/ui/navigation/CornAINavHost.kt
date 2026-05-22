@@ -38,6 +38,9 @@ fun CornAINavHost(
 
     // Scanner State
     val scanState by scannerViewModel.scanState.collectAsState()
+    val liveResult by scannerViewModel.liveResult.collectAsState()
+    val topPredictions by scannerViewModel.topPredictions.collectAsState()
+    val isLiveScanning by scannerViewModel.isLiveScanning.collectAsState()
 
     // Navigation
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -212,10 +215,7 @@ fun CornAINavHost(
                 val homeTotalScans by homeViewModel.totalScans.collectAsState()
                 val homeHealthyScans by homeViewModel.healthyScans.collectAsState()
                 val homeDiseaseScans by homeViewModel.diseaseScans.collectAsState()
-
-                LaunchedEffect(Unit) {
-                    homeViewModel.loadData()
-                }
+                val weatherState by homeViewModel.weatherState.collectAsState()
 
                 HomeScreen(
                     onScanClick = { navController.navigate(Screen.Scanner.route) },
@@ -224,7 +224,8 @@ fun CornAINavHost(
                     totalScans = homeTotalScans,
                     healthyScans = homeHealthyScans,
                     diseaseScans = homeDiseaseScans,
-                    isGuest = isGuest
+                    isGuest = isGuest,
+                    weatherState = weatherState
                 )
             }
 
@@ -233,15 +234,14 @@ fun CornAINavHost(
                 // Reset state when entering the Scanner screen
                 DisposableEffect(Unit) {
                     scannerViewModel.resetState()
-                    onDispose {}
+                    onDispose { scannerViewModel.setLiveScanning(false) }
                 }
 
-                // Handle classification result
+                // Handle classification result (from manual capture or lock-and-save)
                 LaunchedEffect(scanState) {
                     when (val state = scanState) {
                         is UiState.Success -> {
                             val result = state.data
-                            scannerViewModel.saveScanResult(result)
                             navController.navigate(
                                 Screen.Result.createRoute(result.displayName, result.confidence, result.isHealthy)
                             )
@@ -261,7 +261,19 @@ fun CornAINavHost(
                     onClassify = { bitmap ->
                         scannerViewModel.classifyImage(bitmap)
                     },
-                    isClassifying = scanState is UiState.Loading
+                    isClassifying = scanState is UiState.Loading,
+                    liveResult = liveResult,
+                    topPredictions = topPredictions,
+                    isLiveScanning = isLiveScanning,
+                    onLiveFrameAnalyzed = { bitmap ->
+                        scannerViewModel.classifyLiveFrame(bitmap)
+                    },
+                    onLockResult = { result ->
+                        scannerViewModel.lockAndSaveResult(result)
+                    },
+                    onToggleLiveScanning = { enabled ->
+                        scannerViewModel.setLiveScanning(enabled)
+                    }
                 )
             }
 
@@ -340,9 +352,7 @@ fun CornAINavHost(
                 val profileUserEmail by profileViewModel.userEmail.collectAsState()
                 val profileStats by profileViewModel.stats.collectAsState()
 
-                LaunchedEffect(Unit) {
-                    profileViewModel.loadStats()
-                }
+                // Stats are observed in real-time via ProfileViewModel.init -> observeStats()
 
                 ProfileScreen(
                     onBack = { navController.popBackStack() },

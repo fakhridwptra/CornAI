@@ -80,8 +80,9 @@ dependencies {
     // Navigation
     implementation("androidx.navigation:navigation-compose:2.7.6")
 
-    // Pager for Onboarding
-    implementation("androidx.compose.foundation:foundation:1.5.4")
+    // Compose extras (versions managed by BOM)
+    implementation("androidx.compose.foundation:foundation")
+    implementation("androidx.compose.animation:animation")
 
     // ===== CAMERAX =====
     implementation("androidx.camera:camera-core:1.3.1")

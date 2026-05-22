@@ -16,6 +16,7 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -47,6 +48,8 @@ import com.cornai.ui.theme.*
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
+import java.util.concurrent.Executors
+import java.util.concurrent.ExecutorService
 
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
@@ -55,7 +58,13 @@ fun ScannerScreen(
     onBack: () -> Unit,
     onClassify: (Bitmap) -> Unit = {},
     isModelLoading: Boolean = false,
-    isClassifying: Boolean = false
+    isClassifying: Boolean = false,
+    liveResult: com.cornai.ml.ClassificationResult? = null,
+    topPredictions: List<com.cornai.ml.ClassificationResult> = emptyList(),
+    isLiveScanning: Boolean = true,
+    onLiveFrameAnalyzed: (Bitmap) -> Unit = {},
+    onLockResult: (com.cornai.ml.ClassificationResult) -> Unit = {},
+    onToggleLiveScanning: (Boolean) -> Unit = {}
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -133,7 +142,13 @@ fun ScannerScreen(
                         }
                     },
                     onGalleryClick = { galleryLauncher.launch("image/*") },
-                    onBack = onBack
+                    onBack = onBack,
+                    liveResult = liveResult,
+                    topPredictions = topPredictions,
+                    isLiveScanning = isLiveScanning,
+                    onLiveFrameAnalyzed = onLiveFrameAnalyzed,
+                    onLockResult = onLockResult,
+                    onToggleLiveScanning = onToggleLiveScanning
                 )
             }
         }
@@ -173,7 +188,13 @@ private fun CameraPreview(
     onScanStart: (Bitmap) -> Unit,
     onScanFallback: () -> Unit,
     onGalleryClick: () -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    liveResult: com.cornai.ml.ClassificationResult?,
+    topPredictions: List<com.cornai.ml.ClassificationResult>,
+    isLiveScanning: Boolean,
+    onLiveFrameAnalyzed: (Bitmap) -> Unit,
+    onLockResult: (com.cornai.ml.ClassificationResult) -> Unit,
+    onToggleLiveScanning: (Boolean) -> Unit
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -187,23 +208,80 @@ private fun CameraPreview(
     var isCapturing by remember { mutableStateOf(false) }
     val showScanning = isScanning || isCapturing
 
-    DisposableEffect(cameraSelector, isFlashEnabled) {
-        val cameraProvider = cameraProviderFuture.get()
-        val preview = Preview.Builder().build().also { it.setSurfaceProvider(previewView.surfaceProvider) }
+    val analysisExecutor = remember { Executors.newSingleThreadExecutor() }
+    val lastAnalysisTime = remember { java.util.concurrent.atomic.AtomicLong(0L) }
 
-        imageCapture = ImageCapture.Builder()
+    val isLiveScanningRef = rememberUpdatedState(isLiveScanning)
+    val onLiveFrameAnalyzedRef = rememberUpdatedState(onLiveFrameAnalyzed)
+
+    DisposableEffect(cameraSelector, isFlashEnabled, isLiveScanning) {
+        val imageCaptureUseCase = ImageCapture.Builder()
             .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
             .setFlashMode(if (isFlashEnabled) ImageCapture.FLASH_MODE_ON else ImageCapture.FLASH_MODE_OFF)
             .build()
+        imageCapture = imageCaptureUseCase
 
-        try {
-            cameraProvider.unbindAll()
-            cameraProvider.bindToLifecycle(lifecycleOwner, cameraSelector, preview, imageCapture)
-        } catch (e: Exception) {
-            // Handle error
+        val imageAnalysis = ImageAnalysis.Builder()
+            .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+            .build()
+
+        imageAnalysis.setAnalyzer(analysisExecutor) { imageProxy ->
+            try {
+                val currentTime = System.currentTimeMillis()
+                if (isLiveScanningRef.value && (currentTime - lastAnalysisTime.get() >= 400L)) {
+                    lastAnalysisTime.set(currentTime)
+                    val rotationDegrees = imageProxy.imageInfo.rotationDegrees.toFloat()
+                    val bitmap = try {
+                        imageProxy.toBitmap().rotate(rotationDegrees)
+                    } catch (e: Exception) {
+                        null
+                    }
+                    if (bitmap != null) {
+                        onLiveFrameAnalyzedRef.value(bitmap)
+                    }
+                }
+            } catch (e: Exception) {
+                // Ignore frame errors silently
+            } finally {
+                imageProxy.close()
+            }
         }
 
-        onDispose { cameraProvider.unbindAll() }
+        // Non-blocking: addListener fires when camera is ready
+        val listenerExecutor = ContextCompat.getMainExecutor(context)
+        cameraProviderFuture.addListener({
+            try {
+                val cameraProvider = cameraProviderFuture.get()
+                val preview = Preview.Builder().build().also {
+                    it.setSurfaceProvider(previewView.surfaceProvider)
+                }
+                cameraProvider.unbindAll()
+                if (isLiveScanningRef.value) {
+                    cameraProvider.bindToLifecycle(
+                        lifecycleOwner, cameraSelector, preview, imageCaptureUseCase, imageAnalysis
+                    )
+                } else {
+                    cameraProvider.bindToLifecycle(
+                        lifecycleOwner, cameraSelector, preview, imageCaptureUseCase
+                    )
+                }
+            } catch (e: Exception) {
+                // Camera bind failure - handle gracefully
+            }
+        }, listenerExecutor)
+
+        onDispose {
+            try {
+                val cameraProvider = cameraProviderFuture.get()
+                cameraProvider.unbindAll()
+            } catch (e: Exception) { /* ignore */ }
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            analysisExecutor.shutdown()
+        }
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -217,7 +295,7 @@ private fun CameraPreview(
         )
 
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            AnimatedScanningFrame(isScanning = showScanning)
+            AnimatedScanningFrame(isScanning = showScanning, liveResult = liveResult)
         }
 
         Row(
@@ -234,12 +312,30 @@ private fun CameraPreview(
                 Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
             }
 
-            Text(
-                text = if (showScanning) "Memindai..." else "Arahkan ke Daun/Tongkol",
-                color = Color.White,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Medium
-            )
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = if (isLiveScanning) GreenPrimary.copy(alpha = 0.8f) else Color.Black.copy(alpha = 0.6f),
+                modifier = Modifier.clickable { onToggleLiveScanning(!isLiveScanning) }
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(if (isLiveScanning) Color.Green else Color.Gray)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = if (isLiveScanning) "Auto-Scan ON" else "Auto-Scan OFF",
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
 
             Row {
                 IconButton(
@@ -259,76 +355,191 @@ private fun CameraPreview(
         }
 
         Column(
-            modifier = Modifier.fillMaxWidth().align(Alignment.BottomCenter).padding(bottom = 48.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .align(Alignment.BottomCenter)
+                .background(Brush.verticalGradient(colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f))))
+                .padding(bottom = 32.dp, start = 20.dp, end = 20.dp, top = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            if (!showScanning) {
-                Text("Posisikan daun atau tongkol jagung", color = Color.White.copy(alpha = 0.8f), fontSize = 14.sp, textAlign = TextAlign.Center)
-                Text("di dalam bingkai pemindaian", color = Color.White.copy(alpha = 0.8f), fontSize = 14.sp, textAlign = TextAlign.Center)
-                Spacer(modifier = Modifier.height(32.dp))
-                GradientButton(
-                    text = "Mulai Pemindaian",
-                    onClick = {
-                        val capture = imageCapture
-                        if (capture != null) {
-                            isCapturing = true
-                            capture.takePicture(
-                                ContextCompat.getMainExecutor(context),
-                                object : ImageCapture.OnImageCapturedCallback() {
-                                    override fun onCaptureSuccess(image: ImageProxy) {
-                                        val rotationDegrees = image.imageInfo.rotationDegrees.toFloat()
-                                        val bitmap = try {
-                                            image.toBitmap().rotate(rotationDegrees)
-                                        } catch (e: Exception) {
-                                            null
+            if (isLiveScanning) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(24.dp)),
+                    colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.7f)),
+                    border = BorderStroke(
+                        1.dp,
+                        if (liveResult != null) {
+                            if (liveResult.isHealthy) HealthyGreen.copy(alpha = 0.6f) else DiseaseRed.copy(alpha = 0.6f)
+                        } else Color.White.copy(alpha = 0.2f)
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        if (liveResult == null) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                CircularProgressIndicator(color = GreenPrimary, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text(
+                                    text = "Mengamati daun jagung...",
+                                    color = Color.White,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        } else {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text(
+                                        text = "Hasil Deteksi Live",
+                                        color = Color.White.copy(alpha = 0.6f),
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = liveResult.displayName,
+                                        color = Color.White,
+                                        fontSize = 18.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                                
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = if (liveResult.isHealthy) HealthyGreen else DiseaseRed
+                                ) {
+                                    Text(
+                                        text = if (liveResult.isHealthy) "Sehat" else "Penyakit",
+                                        color = Color.White,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            topPredictions.forEach { prediction ->
+                                val barColor = if (prediction.isHealthy) HealthyGreen else DiseaseRed
+                                Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text(prediction.displayName, color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp)
+                                        Text("${(prediction.confidence * 100).toInt()}%", color = barColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    LinearProgressIndicator(
+                                        progress = prediction.confidence,
+                                        color = barColor,
+                                        trackColor = Color.White.copy(alpha = 0.1f),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(4.dp)
+                                            .clip(RoundedCornerShape(2.dp))
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            GradientButton(
+                                text = "Kunci & Simpan Hasil",
+                                onClick = { onLockResult(liveResult) },
+                                modifier = Modifier.fillMaxWidth(),
+                                icon = { Icon(Icons.Default.Lock, contentDescription = null, tint = Color.White) }
+                            )
+                        }
+                    }
+                }
+            } else {
+                if (!showScanning) {
+                    Text("Posisikan daun atau tongkol jagung", color = Color.White.copy(alpha = 0.8f), fontSize = 14.sp, textAlign = TextAlign.Center)
+                    Text("di dalam bingkai pemindaian", color = Color.White.copy(alpha = 0.8f), fontSize = 14.sp, textAlign = TextAlign.Center)
+                    Spacer(modifier = Modifier.height(20.dp))
+                    GradientButton(
+                        text = "Ambil Foto & Analisis",
+                        onClick = {
+                            val capture = imageCapture
+                            if (capture != null) {
+                                isCapturing = true
+                                capture.takePicture(
+                                    ContextCompat.getMainExecutor(context),
+                                    object : ImageCapture.OnImageCapturedCallback() {
+                                        override fun onCaptureSuccess(image: ImageProxy) {
+                                            val rotationDegrees = image.imageInfo.rotationDegrees.toFloat()
+                                            val bitmap = try {
+                                                image.toBitmap().rotate(rotationDegrees)
+                                            } catch (e: Exception) {
+                                                null
+                                            }
+                                            image.close()
+                                            isCapturing = false
+                                            if (bitmap != null) {
+                                                onScanStart(bitmap)
+                                            } else {
+                                                onScanFallback()
+                                            }
                                         }
-                                        image.close()
-                                        isCapturing = false
-                                        if (bitmap != null) {
-                                            onScanStart(bitmap)
-                                        } else {
+
+                                        override fun onError(exception: ImageCaptureException) {
+                                            isCapturing = false
                                             onScanFallback()
                                         }
                                     }
-
-                                    override fun onError(exception: ImageCaptureException) {
-                                        isCapturing = false
-                                        onScanFallback()
-                                    }
-                                }
-                            )
-                        } else {
-                            onScanFallback()
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 48.dp),
-                    icon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color.White) }
-                )
-                Spacer(modifier = Modifier.height(24.dp))
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Color.White.copy(alpha = 0.1f))
-                        .clickable { onGalleryClick() }
-                        .padding(horizontal = 24.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Default.PhotoLibrary, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Atau pilih dari Galeri", color = Color.White, fontSize = 14.sp)
+                                )
+                            } else {
+                                onScanFallback()
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+                        icon = { Icon(Icons.Default.CameraAlt, contentDescription = null, tint = Color.White) }
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(Color.White.copy(alpha = 0.1f))
+                            .clickable { onGalleryClick() }
+                            .padding(horizontal = 24.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.PhotoLibrary, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Pilih dari Galeri", color = Color.White, fontSize = 14.sp)
+                    }
+                } else {
+                    Text("Menganalisis Snapshot...", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Medium)
                 }
-            } else {
-                Text("Menganalisis...", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Medium)
             }
         }
     }
 }
 
 @Composable
-private fun AnimatedScanningFrame(isScanning: Boolean) {
+private fun AnimatedScanningFrame(
+    isScanning: Boolean,
+    liveResult: com.cornai.ml.ClassificationResult? = null
+) {
     val infiniteTransition = rememberInfiniteTransition(label = "frame")
     val animatedOffset by infiniteTransition.animateFloat(initialValue = 0f, targetValue = 1f, animationSpec = infiniteRepeatable(animation = tween(2000, easing = LinearEasing), repeatMode = RepeatMode.Reverse), label = "offset")
     val animatedAlpha by infiniteTransition.animateFloat(initialValue = 0.5f, targetValue = 1f, animationSpec = infiniteRepeatable(animation = tween(500, easing = LinearEasing), repeatMode = RepeatMode.Reverse), label = "alpha")
+
+    val frameColor = when {
+        liveResult == null -> GreenPrimary
+        liveResult.isHealthy -> HealthyGreen
+        else -> DiseaseRed
+    }
 
     Box(modifier = Modifier.size(280.dp), contentAlignment = Alignment.Center) {
         if (!isScanning) {
@@ -336,28 +547,28 @@ private fun AnimatedScanningFrame(isScanning: Boolean) {
             val strokeWidth = 3.dp
 
             Box(modifier = Modifier.align(Alignment.TopStart)) {
-                Box(modifier = Modifier.width(cornerLength).height(strokeWidth).background(GreenPrimary.copy(alpha = animatedAlpha)))
-                Box(modifier = Modifier.width(strokeWidth).height(cornerLength).background(GreenPrimary.copy(alpha = animatedAlpha)))
+                Box(modifier = Modifier.width(cornerLength).height(strokeWidth).background(frameColor.copy(alpha = animatedAlpha)))
+                Box(modifier = Modifier.width(strokeWidth).height(cornerLength).background(frameColor.copy(alpha = animatedAlpha)))
             }
             Box(modifier = Modifier.align(Alignment.TopEnd)) {
-                Box(modifier = Modifier.align(Alignment.TopEnd).width(cornerLength).height(strokeWidth).background(GreenPrimary.copy(alpha = animatedAlpha)))
-                Box(modifier = Modifier.align(Alignment.TopEnd).width(strokeWidth).height(cornerLength).background(GreenPrimary.copy(alpha = animatedAlpha)))
+                Box(modifier = Modifier.align(Alignment.TopEnd).width(cornerLength).height(strokeWidth).background(frameColor.copy(alpha = animatedAlpha)))
+                Box(modifier = Modifier.align(Alignment.TopEnd).width(strokeWidth).height(cornerLength).background(frameColor.copy(alpha = animatedAlpha)))
             }
             Box(modifier = Modifier.align(Alignment.BottomStart)) {
-                Box(modifier = Modifier.align(Alignment.BottomStart).width(cornerLength).height(strokeWidth).background(GreenPrimary.copy(alpha = animatedAlpha)))
-                Box(modifier = Modifier.align(Alignment.BottomStart).width(strokeWidth).height(cornerLength).background(GreenPrimary.copy(alpha = animatedAlpha)))
+                Box(modifier = Modifier.align(Alignment.BottomStart).width(cornerLength).height(strokeWidth).background(frameColor.copy(alpha = animatedAlpha)))
+                Box(modifier = Modifier.align(Alignment.BottomStart).width(strokeWidth).height(cornerLength).background(frameColor.copy(alpha = animatedAlpha)))
             }
             Box(modifier = Modifier.align(Alignment.BottomEnd)) {
-                Box(modifier = Modifier.align(Alignment.BottomEnd).width(cornerLength).height(strokeWidth).background(GreenPrimary.copy(alpha = animatedAlpha)))
-                Box(modifier = Modifier.align(Alignment.BottomEnd).width(strokeWidth).height(cornerLength).background(GreenPrimary.copy(alpha = animatedAlpha)))
+                Box(modifier = Modifier.align(Alignment.BottomEnd).width(cornerLength).height(strokeWidth).background(frameColor.copy(alpha = animatedAlpha)))
+                Box(modifier = Modifier.align(Alignment.BottomEnd).width(strokeWidth).height(cornerLength).background(frameColor.copy(alpha = animatedAlpha)))
             }
 
             Box(
                 modifier = Modifier.fillMaxWidth().height(2.dp).align(Alignment.TopStart).padding(top = (240 * animatedOffset).dp)
-                    .background(Brush.horizontalGradient(colors = listOf(Color.Transparent, GoldPrimary.copy(alpha = 0.8f), Color.Transparent)))
+                    .background(Brush.horizontalGradient(colors = listOf(Color.Transparent, frameColor.copy(alpha = 0.8f), Color.Transparent)))
             )
         } else {
-            ScanningIndicator(size = 260.dp)
+            ScanningIndicator(size = 260.dp, primaryColor = frameColor)
         }
     }
 }

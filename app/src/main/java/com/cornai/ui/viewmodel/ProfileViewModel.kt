@@ -26,15 +26,24 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
     private val _stats = MutableStateFlow(Triple(0, 0, 0))
     val stats: StateFlow<Triple<Int, Int, Int>> = _stats.asStateFlow()
 
-    fun loadStats() {
+    init {
+        observeStats()
+    }
+
+    private fun observeStats() {
         viewModelScope.launch {
-            try {
-                val (total, healthy, disease) = repository.getLocalStats()
+            repository.getLocalHistoryFlow().collect { history ->
+                val total = history.size
+                val healthy = history.count { it.isHealthy }
+                val disease = history.count { !it.isHealthy }
                 _stats.value = Triple(total, healthy, disease)
-            } catch (e: Exception) {
-                // Handle error
             }
         }
+    }
+
+    fun loadStats() {
+        // Observers handle data in real-time now, keeping signature for compatibility
+        observeStats()
     }
 
     fun signOut() {

@@ -138,10 +138,10 @@ class CornAIRepository(
     // ========== SCAN HISTORY ==========
 
     fun getHistoryFlow(): Flow<List<ScanHistory>> {
-        return scanHistoryDao.getHistoryByUser("demo").let { flow ->
-            kotlinx.coroutines.flow.flow {
-                // Simple conversion
-                emit(emptyList())
+        return kotlinx.coroutines.flow.flow {
+            val userId = getCurrentUserId()
+            scanHistoryDao.getHistoryByUser(userId).collect { entities ->
+                emit(entities.map { it.toScanHistory() })
             }
         }
     }
@@ -207,7 +207,10 @@ class CornAIRepository(
 
     fun getLocalHistoryFlow(): Flow<List<ScanHistory>> {
         return kotlinx.coroutines.flow.flow {
-            emit(getHistory())
+            val userId = getCurrentUserId()
+            scanHistoryDao.getHistoryByUser(userId).collect { entities ->
+                emit(entities.map { it.toScanHistory() })
+            }
         }
     }
 

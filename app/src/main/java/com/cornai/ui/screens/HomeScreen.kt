@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.sp
 import com.cornai.ui.components.CornIcon
 import com.cornai.ui.components.GradientButton
 import com.cornai.ui.theme.*
+import com.cornai.ui.viewmodel.WeatherData
 
 data class QuickFeature(
     val icon: ImageVector,
@@ -39,7 +40,8 @@ fun HomeScreen(
     totalScans: Int = 0,
     healthyScans: Int = 0,
     diseaseScans: Int = 0,
-    isGuest: Boolean = false
+    isGuest: Boolean = false,
+    weatherState: WeatherData = WeatherData("Cerah", 32, "Ideal untuk menyemrot pestisida", "🌤️", "Siang")
 ) {
     val scrollState = rememberScrollState()
     val infiniteTransition = rememberInfiniteTransition(label = "home")
@@ -96,7 +98,7 @@ fun HomeScreen(
                 .verticalScroll(scrollState),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            WeatherWidget()
+            WeatherWidget(weather = weatherState)
             HeroSection(pulseScale = pulseScale)
             DailyTipsCard()
 
@@ -213,26 +215,35 @@ private fun HeroSection(pulseScale: Float) {
 }
 
 @Composable
-private fun WeatherWidget() {
+private fun WeatherWidget(weather: WeatherData) {
     Card(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = Surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
-        Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(modifier = Modifier.size(56.dp).clip(RoundedCornerShape(16.dp)).background(Color(0xFF87CEEB).copy(alpha = 0.2f)), contentAlignment = Alignment.Center) {
-                Icon(Icons.Default.WbSunny, contentDescription = null, tint = Color(0xFFFFB300), modifier = Modifier.size(32.dp))
-            }
-            Spacer(modifier = Modifier.width(16.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text("Cuaca Hari Ini", fontSize = 12.sp, color = TextSecondary)
-                Text("Cerah, 32°C", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-                Text("Idealnya untuk menyemrot pestisida", fontSize = 12.sp, color = TextSecondary)
-            }
-            Column(horizontalAlignment = Alignment.End) {
-                Text("🌤️", fontSize = 24.sp)
-                Text("Siang", fontSize = 11.sp, color = TextSecondary)
+        AnimatedContent(
+            targetState = weather,
+            transitionSpec = {
+                (fadeIn(animationSpec = tween(500)) + slideInVertically(animationSpec = tween(500), initialOffsetY = { it }))
+                    .togetherWith(fadeOut(animationSpec = tween(500)) + slideOutVertically(animationSpec = tween(500), targetOffsetY = { -it }))
+            },
+            label = "weatherAnimation"
+        ) { targetWeather ->
+            Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(modifier = Modifier.size(56.dp).clip(RoundedCornerShape(16.dp)).background(Color(0xFF87CEEB).copy(alpha = 0.2f)), contentAlignment = Alignment.Center) {
+                    Text(targetWeather.emoji, fontSize = 28.sp)
+                }
+                Spacer(modifier = Modifier.width(16.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Cuaca Hari Ini", fontSize = 12.sp, color = TextSecondary)
+                    Text("${targetWeather.condition}, ${targetWeather.temperature}°C", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                    Text(targetWeather.recommendation, fontSize = 12.sp, color = TextSecondary)
+                }
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(targetWeather.emoji, fontSize = 24.sp)
+                    Text(targetWeather.timeOfDay, fontSize = 11.sp, color = TextSecondary)
+                }
             }
         }
     }
