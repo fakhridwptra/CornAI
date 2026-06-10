@@ -235,9 +235,10 @@ fun HomeScreen(
                 )
 
                 val allClasses = listOf(
-                    "Common Rust", "Northern Leaf Blight", "Gray Leaf Spot", 
-                    "Common Smut", "Healthy Leaf", "Healthy Cob", 
-                    "Asphalt Stain", "Cob Rot", "Eyespot", "Maize Streak"
+                    "Asphalt Stain", "Bacterial Leaf Streak", "Bipolaris",
+                    "Northern Leaf Blight", "Common Rust", "Gray Leaf Spot",
+                    "Healthy Leaf", "Healthy Cob", "Stenocarpella",
+                    "Unhealthy Cob"
                 )
                 val filteredClasses = allClasses.filter { it.contains(searchQuery, ignoreCase = true) }
 
