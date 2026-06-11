@@ -126,8 +126,9 @@ class CornAIModel(private val context: Context) {
                 // 1. Boost Healthy Daun (index 6) by 4.0x to suppress false disease alarms on healthy leaves.
                 // 2. Boost Healthy Tongkol (index 7) by 1.5x (already accurate, keep standard).
                 // 3. Boost Bacterial Leaf Streak (index 1) by 1.5x, Bipolaris (index 2) by 2.5x, and Asphalt Stain (index 0) by 1.5x.
-                // 4. Damp Gray Leaf Spot (index 5) by 0.3x to prevent it from overtaking BLS, Bipolaris, and Healthy.
+                // 4. Damp Gray Leaf Spot (index 5) by 0.15x to prevent it from overtaking BLS, Bipolaris, and Healthy.
                 // 5. Damp Common Rust (index 4) by 0.05x to prevent it from overtaking Asphalt Stain.
+                // 6. Damp Unhealthy Tongkol (index 9) by 0.25x to prevent false alarms on Healthy Tongkol.
                 var value = rawProbs[i]
                 when (i) {
                     6 -> value *= 4.0f
@@ -135,8 +136,9 @@ class CornAIModel(private val context: Context) {
                     1 -> value *= 1.5f
                     2 -> value *= 2.5f
                     0 -> value *= 1.5f
-                    5 -> value *= 0.3f
+                    5 -> value *= 0.15f
                     4 -> value *= 0.05f
+                    9 -> value *= 0.25f
                 }
                 filtered[i] = value
                 sum += value
