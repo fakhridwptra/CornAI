@@ -123,17 +123,20 @@ class CornAIModel(private val context: Context) {
         for (i in rawProbs.indices) {
             if (i in allowedIndices) {
                 // Fine-tune model bias to fix real-world classification inaccuracy:
-                // 1. Boost Healthy Daun (index 6) by 3.0x to suppress false disease alarms on healthy leaves.
+                // 1. Boost Healthy Daun (index 6) by 4.0x to suppress false disease alarms on healthy leaves.
                 // 2. Boost Healthy Tongkol (index 7) by 1.5x (already accurate, keep standard).
-                // 3. Boost Bacterial Leaf Streak (index 1) and Bipolaris (index 2) by 1.3x.
-                // 4. Damp Gray Leaf Spot (index 5) by 0.8x to balance visually similar spot/blight diseases.
+                // 3. Boost Bacterial Leaf Streak (index 1), Bipolaris (index 2), and Asphalt Stain (index 0) by 1.5x.
+                // 4. Damp Gray Leaf Spot (index 5) by 0.4x to prevent it from overtaking BLS, Bipolaris, and Healthy.
+                // 5. Damp Common Rust (index 4) by 0.5x to prevent it from overtaking Asphalt Stain.
                 var value = rawProbs[i]
                 when (i) {
-                    6 -> value *= 3.0f
+                    6 -> value *= 4.0f
                     7 -> value *= 1.5f
-                    1 -> value *= 1.3f
-                    2 -> value *= 1.3f
-                    5 -> value *= 0.8f
+                    1 -> value *= 1.5f
+                    2 -> value *= 1.5f
+                    0 -> value *= 1.5f
+                    5 -> value *= 0.4f
+                    4 -> value *= 0.5f
                 }
                 filtered[i] = value
                 sum += value
