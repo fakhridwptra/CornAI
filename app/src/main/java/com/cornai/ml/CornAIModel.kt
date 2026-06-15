@@ -122,24 +122,7 @@ class CornAIModel(private val context: Context) {
         var sum = 0f
         for (i in rawProbs.indices) {
             if (i in allowedIndices) {
-                // Fine-tune model bias to fix real-world classification inaccuracy:
-                // 1. Boost Healthy Daun (index 6) by 4.0x to suppress false disease alarms on healthy leaves.
-                // 2. Boost Healthy Tongkol (index 7) by 1.5x (already accurate, keep standard).
-                // 3. Boost Bacterial Leaf Streak (index 1) by 1.5x, Bipolaris (index 2) by 2.5x, and Asphalt Stain (index 0) by 1.5x.
-                // 4. Damp Gray Leaf Spot (index 5) by 0.15x to prevent it from overtaking BLS, Bipolaris, and Healthy.
-                // 5. Damp Common Rust (index 4) by 0.05x to prevent it from overtaking Asphalt Stain.
-                // 6. Damp Unhealthy Tongkol (index 9) by 0.25x to prevent false alarms on Healthy Tongkol.
                 var value = rawProbs[i]
-                when (i) {
-                    6 -> value *= 4.0f
-                    7 -> value *= 1.5f
-                    1 -> value *= 1.5f
-                    2 -> value *= 2.5f
-                    0 -> value *= 1.5f
-                    5 -> value *= 0.15f
-                    4 -> value *= 0.05f
-                    9 -> value *= 0.25f
-                }
                 filtered[i] = value
                 sum += value
             } else {
@@ -227,6 +210,85 @@ class CornAIModel(private val context: Context) {
                 recoveryTime = diseaseInfo.recoveryTime
             )
         }
+    }
+
+    fun classifyAllClasses(bitmap: android.graphics.Bitmap): List<ClassificationResult> {
+        val currentInterpreter = interpreter
+        if (currentInterpreter == null) return emptyList()
+
+        val inputBuffer = preprocessBitmap(bitmap)
+        val numClasses = 10
+        val outputBuffer = Array(1) { FloatArray(numClasses) }
+
+        try {
+            currentInterpreter.run(inputBuffer, outputBuffer)
+        } catch (e: Exception) {
+            return emptyList()
+        }
+
+        val rawProbs = applySoftmax(outputBuffer[0])
+        return rawProbs.indices.map { index ->
+            val rawClassName = labels.getOrNull(index) ?: "Unknown"
+            val className = sanitizeClassName(rawClassName)
+            val diseaseInfo = DiseaseData.getDiseaseInfo(className)
+
+            ClassificationResult(
+                className = className,
+                displayName = diseaseInfo.displayName,
+                confidence = rawProbs[index],
+                isHealthy = diseaseInfo.isHealthy,
+                symptoms = diseaseInfo.symptoms,
+                treatment = diseaseInfo.treatment,
+                prevention = diseaseInfo.prevention,
+                severity = diseaseInfo.severity,
+                recoveryTime = diseaseInfo.recoveryTime
+            )
+        }.sortedByDescending { it.confidence }
+    }
+
+    fun getDemoAllClasses(selectedClassName: String): List<ClassificationResult> {
+        val allKeys = DiseaseData.getAllClassNames()
+        val probs = FloatArray(allKeys.size)
+        
+        // Find match
+        var selectedIdx = allKeys.indexOf(selectedClassName)
+        if (selectedIdx == -1) {
+            // Try matching display name
+            selectedIdx = allKeys.indexOfFirst {
+                DiseaseData.getDisplayName(it).equals(selectedClassName, ignoreCase = true)
+            }
+        }
+        selectedIdx = selectedIdx.coerceAtLeast(0)
+        
+        val mainProb = (70..95).random() / 100f
+        probs[selectedIdx] = mainProb
+        
+        var remaining = 1.0f - mainProb
+        val otherIndices = probs.indices.filter { it != selectedIdx }.shuffled()
+        for (i in otherIndices.indices) {
+            if (i == otherIndices.lastIndex) {
+                probs[otherIndices[i]] = remaining
+            } else {
+                val p = (0..(remaining * 100).toInt()).random() / 100f
+                probs[otherIndices[i]] = p
+                remaining -= p
+            }
+        }
+        
+        return allKeys.mapIndexed { index, className ->
+            val diseaseInfo = DiseaseData.getDiseaseInfo(className)
+            ClassificationResult(
+                className = className,
+                displayName = diseaseInfo.displayName,
+                confidence = probs[index],
+                isHealthy = diseaseInfo.isHealthy,
+                symptoms = diseaseInfo.symptoms,
+                treatment = diseaseInfo.treatment,
+                prevention = diseaseInfo.prevention,
+                severity = diseaseInfo.severity,
+                recoveryTime = diseaseInfo.recoveryTime
+            )
+        }.sortedByDescending { it.confidence }
     }
 
     private fun getDemoResult(mode: String): ClassificationResult {

@@ -29,6 +29,9 @@ class ScannerViewModel(application: Application) : AndroidViewModel(application)
     private val _topPredictions = MutableStateFlow<List<ClassificationResult>>(emptyList())
     val topPredictions: StateFlow<List<ClassificationResult>> = _topPredictions.asStateFlow()
 
+    private val _allPredictions = MutableStateFlow<List<ClassificationResult>>(emptyList())
+    val allPredictions: StateFlow<List<ClassificationResult>> = _allPredictions.asStateFlow()
+
     private val _savedHistoryId = MutableStateFlow<String?>(null)
     val savedHistoryId: StateFlow<String?> = _savedHistoryId.asStateFlow()
 
@@ -79,9 +82,13 @@ class ScannerViewModel(application: Application) : AndroidViewModel(application)
                     if (aiModel.isModelLoaded()) {
                         val singleResult = aiModel.classify(bitmap, currentMode)
                         android.util.Log.d("ScannerViewModel", "Live Scan ($currentMode) - Prediksi: ${singleResult.className}, Confidence: ${singleResult.confidence}")
+                        
+                        val allResults = aiModel.classifyAllClasses(bitmap)
+                        _allPredictions.value = allResults
+                        
                         if (singleResult.confidence >= 0.40f) {
-                            val allResults = aiModel.classifyWithMultiplePredictions(bitmap, 3, currentMode)
-                            _topPredictions.value = allResults
+                            val allResultsFiltered = aiModel.classifyWithMultiplePredictions(bitmap, 3, currentMode)
+                            _topPredictions.value = allResultsFiltered
                             singleResult
                         } else {
                             _topPredictions.value = emptyList()
@@ -89,7 +96,10 @@ class ScannerViewModel(application: Application) : AndroidViewModel(application)
                         }
                     } else {
                         // Demo mode
-                        getDemoResult(currentMode)
+                        val demoRes = getDemoResult(currentMode)
+                        val demoAll = aiModel.getDemoAllClasses(demoRes.className)
+                        _allPredictions.value = demoAll
+                        demoRes
                     }
                 }
                 if (_isLiveScanning.value) {
@@ -134,16 +144,23 @@ class ScannerViewModel(application: Application) : AndroidViewModel(application)
                     if (aiModel.isModelLoaded()) {
                         val singleResult = aiModel.classify(bitmap, currentMode)
                         android.util.Log.d("ScannerViewModel", "Gallery/Manual ($currentMode) - Prediksi: ${singleResult.className}, Confidence: ${singleResult.confidence}")
+                        
+                        val allResults = aiModel.classifyAllClasses(bitmap)
+                        _allPredictions.value = allResults
+                        
                         if (singleResult.confidence >= 0.40f) {
-                            val allResults = aiModel.classifyWithMultiplePredictions(bitmap, 3, currentMode)
-                            _topPredictions.value = allResults
+                            val allResultsFiltered = aiModel.classifyWithMultiplePredictions(bitmap, 3, currentMode)
+                            _topPredictions.value = allResultsFiltered
                             singleResult
                         } else {
                             throw Exception("Objek tidak dikenali (Keyakinan: ${(singleResult.confidence * 100).toInt()}%). Pastikan Anda memindai daun atau tongkol jagung dengan jelas.")
                         }
                     } else {
                         // Demo mode - return mock result
-                        getDemoResult(currentMode)
+                        val demoRes = getDemoResult(currentMode)
+                        val demoAll = aiModel.getDemoAllClasses(demoRes.className)
+                        _allPredictions.value = demoAll
+                        demoRes
                     }
                 }
 
@@ -179,6 +196,7 @@ class ScannerViewModel(application: Application) : AndroidViewModel(application)
         _scanState.value = UiState.Idle
         _savedHistoryId.value = null
         _topPredictions.value = emptyList()
+        _allPredictions.value = emptyList()
         _liveResult.value = null
     }
 

@@ -63,7 +63,8 @@ fun ResultScreen(
     isHealthy: Boolean,
     onScanAgain: () -> Unit,
     onBackToHome: () -> Unit,
-    onViewDetail: () -> Unit = {}
+    onViewDetail: () -> Unit = {},
+    allPredictions: List<com.cornai.ml.ClassificationResult> = emptyList()
 ) {
     val context = LocalContext.current
     val scrollState = rememberScrollState()
@@ -125,6 +126,11 @@ fun ResultScreen(
 
             // Confidence Score Section
             ConfidenceSection(confidence = confidence)
+
+            if (allPredictions.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(20.dp))
+                AllClassesSection(allPredictions = allPredictions, diagnosedName = diseaseName)
+            }
 
             Spacer(modifier = Modifier.height(20.dp))
 
@@ -365,6 +371,152 @@ private fun ConfidenceSection(confidence: Float) {
         }
     }
 }
+
+@Composable
+private fun AllClassesSection(
+    allPredictions: List<com.cornai.ml.ClassificationResult>,
+    diagnosedName: String
+) {
+    if (allPredictions.isEmpty()) return
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp),
+        shape = RoundedCornerShape(24.dp),
+        border = androidx.compose.foundation.BorderStroke(0.5.dp, GreenPrimary.copy(alpha = 0.15f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Brush.verticalGradient(colors = listOf(Surface, SurfaceVariant)))
+                .padding(24.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(GreenPrimary.copy(alpha = 0.1f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Analytics,
+                        contentDescription = null,
+                        tint = GreenPrimary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text(
+                        text = "Analisis Probabilitas Lengkap",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary
+                    )
+                    Text(
+                        text = "Persentase kecocokan 10 kelas diagnosis AI",
+                        fontSize = 12.sp,
+                        color = TextSecondary
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            allPredictions.forEachIndexed { index, prediction ->
+                val isDiagnosed = prediction.displayName.equals(diagnosedName, ignoreCase = true) ||
+                                  prediction.className.equals(diagnosedName, ignoreCase = true)
+                
+                val progressColor = if (prediction.isHealthy) HealthyGreen else DiseaseRed
+                val animatedProgress by animateFloatAsState(
+                    targetValue = prediction.confidence,
+                    animationSpec = tween(durationMillis = 1000, delayMillis = 100 + index * 50, easing = EaseOutQuad),
+                    label = "barProgress"
+                )
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(
+                            if (isDiagnosed) progressColor.copy(alpha = 0.08f) else Color.Transparent
+                        )
+                        .padding(horizontal = 8.dp, vertical = 6.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(
+                                imageVector = if (prediction.isHealthy) Icons.Default.CheckCircle else Icons.Default.Warning,
+                                contentDescription = null,
+                                tint = progressColor,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = prediction.displayName,
+                                fontSize = 13.sp,
+                                fontWeight = if (isDiagnosed) FontWeight.Bold else FontWeight.Medium,
+                                color = if (isDiagnosed) TextPrimary else TextPrimary.copy(alpha = 0.8f)
+                            )
+                            if (isDiagnosed) {
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(progressColor.copy(alpha = 0.15f))
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = "Hasil Utama",
+                                        color = progressColor,
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                        
+                        Text(
+                            text = String.format("%.1f%%", prediction.confidence * 100f),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isDiagnosed) progressColor else TextPrimary
+                        )
+                    }
+                    
+                    Spacer(modifier = Modifier.height(6.dp))
+                    
+                    LinearProgressIndicator(
+                        progress = animatedProgress,
+                        color = progressColor,
+                        trackColor = Color.White.copy(alpha = 0.08f),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(6.dp)
+                            .clip(RoundedCornerShape(3.dp))
+                    )
+                }
+
+                if (index < allPredictions.lastIndex) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+            }
+        }
+    }
+}
+
 
 @Composable
 private fun CircularScoreIndicator(confidence: Float) {

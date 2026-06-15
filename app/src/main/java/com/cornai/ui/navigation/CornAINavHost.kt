@@ -318,6 +318,7 @@ fun CornAINavHost(
                 val diseaseName = backStackEntry.arguments?.getString("diseaseName") ?: ""
                 val confidence = backStackEntry.arguments?.getFloat("confidence") ?: 0f
                 val isHealthy = backStackEntry.arguments?.getBoolean("isHealthy") ?: true
+                val allPredictions by scannerViewModel.allPredictions.collectAsState()
 
                 ResultScreen(
                     diseaseName = diseaseName,
@@ -337,7 +338,8 @@ fun CornAINavHost(
                         navController.navigate(
                             Screen.ResultDetail.createRoute(diseaseName, confidence, isHealthy)
                         )
-                    }
+                    },
+                    allPredictions = allPredictions
                 )
             }
 
