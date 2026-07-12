@@ -1,0 +1,8 @@
+Asphalt_stain
+Bacterial Leaf Streak
+Bipolaris
+Blight
+Common_Rust
+Gray_Leaf_Spot
+Healthy_Daun
+Stenocarpella

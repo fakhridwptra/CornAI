@@ -21,43 +21,71 @@ data class ClassificationResult(
 
 class CornAIModel(private val context: Context) {
 
-    private var interpreter: Interpreter? = null
-    private var labels: List<String> = emptyList()
+    private var daunInterpreter: Interpreter? = null
+    private var tongkolInterpreter: Interpreter? = null
+
+    private var daunLabels: List<String> = emptyList()
+    private var tongkolLabels: List<String> = emptyList()
 
     companion object {
-        private const val MODEL_FILE = "model_cornai.tflite"
-        private const val LABEL_FILE = "labels.txt"
+        private const val DAUN_MODEL_FILE = "daun.tflite"
+        private const val TONGKOL_MODEL_FILE = "tongkol.tflite"
+
+        private const val DAUN_LABEL_FILE = "labels_daun.txt"
+        private const val TONGKOL_LABEL_FILE = "labels_tongkol.txt"
+
         private const val INPUT_SIZE = 224
     }
 
     fun loadModel(): Boolean {
-        android.util.Log.d("CornAIModel", "Mulai memuat model TFLite tunggal...")
-        return try {
-            val modelBuffer = FileUtil.loadMappedFile(context, MODEL_FILE)
-            val options = Interpreter.Options().apply { numThreads = 4 }
-            interpreter = Interpreter(modelBuffer, options)
-            labels = FileUtil.loadLabels(context, LABEL_FILE)
-            android.util.Log.i("CornAIModel", "Model TFLite tunggal berhasil dimuat!")
-            true
+        android.util.Log.d("CornAIModel", "Mulai memuat dua model TFLite terpisah (Daun & Tongkol)...")
+        var success = true
+        val options = Interpreter.Options().apply { numThreads = 4 }
+
+        // Load Daun model
+        try {
+            val daunBuffer = FileUtil.loadMappedFile(context, DAUN_MODEL_FILE)
+            daunInterpreter = Interpreter(daunBuffer, options)
+            daunLabels = FileUtil.loadLabels(context, DAUN_LABEL_FILE)
+            android.util.Log.i("CornAIModel", "Model TFLite Daun berhasil dimuat!")
         } catch (e: Throwable) {
-            android.util.Log.e("CornAIModel", "Gagal memuat model TFLite: ${e.message}", e)
-            false
+            android.util.Log.e("CornAIModel", "Gagal memuat model TFLite Daun: ${e.message}", e)
+            success = false
         }
+
+        // Load Tongkol model
+        try {
+            val tongkolBuffer = FileUtil.loadMappedFile(context, TONGKOL_MODEL_FILE)
+            tongkolInterpreter = Interpreter(tongkolBuffer, options)
+            tongkolLabels = FileUtil.loadLabels(context, TONGKOL_LABEL_FILE)
+            android.util.Log.i("CornAIModel", "Model TFLite Tongkol berhasil dimuat!")
+        } catch (e: Throwable) {
+            android.util.Log.e("CornAIModel", "Gagal memuat model TFLite Tongkol: ${e.message}", e)
+            success = false
+        }
+
+        return success
     }
 
     fun classify(bitmap: android.graphics.Bitmap, mode: String = "daun"): ClassificationResult {
-        val currentInterpreter = interpreter
+        val currentInterpreter = if (mode == "tongkol") tongkolInterpreter else daunInterpreter
+        val currentLabels = if (mode == "tongkol") tongkolLabels else daunLabels
 
         return if (currentInterpreter != null) {
-            classifyWithModel(bitmap, currentInterpreter, mode)
+            classifyWithModel(bitmap, currentInterpreter, currentLabels, mode)
         } else {
             getDemoResult(mode)
         }
     }
 
-    private fun classifyWithModel(bitmap: android.graphics.Bitmap, interpreter: Interpreter, mode: String): ClassificationResult {
+    private fun classifyWithModel(
+        bitmap: android.graphics.Bitmap,
+        interpreter: Interpreter,
+        labels: List<String>,
+        mode: String
+    ): ClassificationResult {
         val inputBuffer = preprocessBitmap(bitmap)
-        val numClasses = 10
+        val numClasses = labels.size
         val outputBuffer = Array(1) { FloatArray(numClasses) }
 
         try {
@@ -66,7 +94,7 @@ class CornAIModel(private val context: Context) {
             return getDemoResult(mode)
         }
 
-        return postprocessOutput(outputBuffer[0], mode)
+        return postprocessOutput(outputBuffer[0], labels)
     }
 
     private fun preprocessBitmap(bitmap: android.graphics.Bitmap): ByteBuffer {
@@ -112,44 +140,11 @@ class CornAIModel(private val context: Context) {
         return className.replace(" ", "_")
     }
 
-    private fun filterAndNormalize(output: FloatArray, mode: String): FloatArray {
-        val rawProbs = applySoftmax(output)
-        val filtered = FloatArray(rawProbs.size)
-        val leafIndices = setOf(0, 1, 2, 3, 4, 5, 6, 8)
-        val cobIndices = setOf(7, 9)
-        val allowedIndices = if (mode == "tongkol") cobIndices else leafIndices
-
-        var sum = 0f
-        for (i in rawProbs.indices) {
-            if (i in allowedIndices) {
-                var value = rawProbs[i]
-                filtered[i] = value
-                sum += value
-            } else {
-                filtered[i] = 0f
-            }
-        }
-
-        if (sum > 0f) {
-            for (i in filtered.indices) {
-                filtered[i] /= sum
-            }
-        } else {
-            val valForAllowed = 1f / allowedIndices.size
-            for (i in filtered.indices) {
-                if (i in allowedIndices) {
-                    filtered[i] = valForAllowed
-                }
-            }
-        }
-        return filtered
-    }
-
-    private fun postprocessOutput(output: FloatArray, mode: String): ClassificationResult {
-        val probabilities = filterAndNormalize(output, mode)
+    private fun postprocessOutput(output: FloatArray, labels: List<String>): ClassificationResult {
+        val probabilities = applySoftmax(output)
         val maxIdx = probabilities.indices.maxByOrNull { probabilities[it] } ?: 0
         val confidence = probabilities[maxIdx]
-        
+
         val rawClassName = labels.getOrNull(maxIdx) ?: "Unknown"
         val className = sanitizeClassName(rawClassName)
 
@@ -168,12 +163,18 @@ class CornAIModel(private val context: Context) {
         )
     }
 
-    fun classifyWithMultiplePredictions(bitmap: android.graphics.Bitmap, topK: Int = 3, mode: String = "daun"): List<ClassificationResult> {
-        val currentInterpreter = interpreter
+    fun classifyWithMultiplePredictions(
+        bitmap: android.graphics.Bitmap,
+        topK: Int = 3,
+        mode: String = "daun"
+    ): List<ClassificationResult> {
+        val currentInterpreter = if (mode == "tongkol") tongkolInterpreter else daunInterpreter
+        val currentLabels = if (mode == "tongkol") tongkolLabels else daunLabels
+
         if (currentInterpreter == null) return listOf(getDemoResult(mode))
 
         val inputBuffer = preprocessBitmap(bitmap)
-        val numClasses = 10
+        val numClasses = currentLabels.size
         val outputBuffer = Array(1) { FloatArray(numClasses) }
 
         try {
@@ -182,19 +183,14 @@ class CornAIModel(private val context: Context) {
             return listOf(getDemoResult(mode))
         }
 
-        val probabilities = filterAndNormalize(outputBuffer[0], mode)
-        val leafIndices = setOf(0, 1, 2, 3, 4, 5, 6, 8)
-        val cobIndices = setOf(7, 9)
-        val allowedIndices = if (mode == "tongkol") cobIndices else leafIndices
-        
-        val limit = minOf(topK, allowedIndices.size)
+        val probabilities = applySoftmax(outputBuffer[0])
+        val limit = minOf(topK, numClasses)
         val sortedIndices = probabilities.indices
-            .filter { it in allowedIndices }
             .sortedByDescending { probabilities[it] }
             .take(limit)
 
         return sortedIndices.map { index ->
-            val rawClassName = labels.getOrNull(index) ?: "Unknown"
+            val rawClassName = currentLabels.getOrNull(index) ?: "Unknown"
             val className = sanitizeClassName(rawClassName)
             val diseaseInfo = DiseaseData.getDiseaseInfo(className)
 
@@ -212,12 +208,15 @@ class CornAIModel(private val context: Context) {
         }
     }
 
-    fun classifyAllClasses(bitmap: android.graphics.Bitmap): List<ClassificationResult> {
-        val currentInterpreter = interpreter
+    fun classifyAllClasses(bitmap: android.graphics.Bitmap, mode: String = "daun"): List<ClassificationResult> {
+        val currentInterpreter = if (mode == "tongkol") tongkolInterpreter else daunInterpreter
+        val currentLabels = if (mode == "tongkol") tongkolLabels else daunLabels
+        val otherLabels = if (mode == "tongkol") daunLabels else tongkolLabels
+
         if (currentInterpreter == null) return emptyList()
 
         val inputBuffer = preprocessBitmap(bitmap)
-        val numClasses = 10
+        val numClasses = currentLabels.size
         val outputBuffer = Array(1) { FloatArray(numClasses) }
 
         try {
@@ -227,8 +226,10 @@ class CornAIModel(private val context: Context) {
         }
 
         val rawProbs = applySoftmax(outputBuffer[0])
-        return rawProbs.indices.map { index ->
-            val rawClassName = labels.getOrNull(index) ?: "Unknown"
+
+        // 1. Map predicted labels with their actual probabilities
+        val activeResults = rawProbs.indices.map { index ->
+            val rawClassName = currentLabels.getOrNull(index) ?: "Unknown"
             val className = sanitizeClassName(rawClassName)
             val diseaseInfo = DiseaseData.getDiseaseInfo(className)
 
@@ -243,26 +244,45 @@ class CornAIModel(private val context: Context) {
                 severity = diseaseInfo.severity,
                 recoveryTime = diseaseInfo.recoveryTime
             )
-        }.sortedByDescending { it.confidence }
+        }
+
+        // 2. Pad other mode labels with 0.0f confidence to form the complete 10-class list
+        val inactiveResults = otherLabels.map { rawClassName ->
+            val className = sanitizeClassName(rawClassName)
+            val diseaseInfo = DiseaseData.getDiseaseInfo(className)
+
+            ClassificationResult(
+                className = className,
+                displayName = diseaseInfo.displayName,
+                confidence = 0.0f,
+                isHealthy = diseaseInfo.isHealthy,
+                symptoms = diseaseInfo.symptoms,
+                treatment = diseaseInfo.treatment,
+                prevention = diseaseInfo.prevention,
+                severity = diseaseInfo.severity,
+                recoveryTime = diseaseInfo.recoveryTime
+            )
+        }
+
+        // Combine and sort by confidence descending
+        return (activeResults + inactiveResults).sortedByDescending { it.confidence }
     }
 
     fun getDemoAllClasses(selectedClassName: String): List<ClassificationResult> {
         val allKeys = DiseaseData.getAllClassNames()
         val probs = FloatArray(allKeys.size)
-        
-        // Find match
+
         var selectedIdx = allKeys.indexOf(selectedClassName)
         if (selectedIdx == -1) {
-            // Try matching display name
             selectedIdx = allKeys.indexOfFirst {
                 DiseaseData.getDisplayName(it).equals(selectedClassName, ignoreCase = true)
             }
         }
         selectedIdx = selectedIdx.coerceAtLeast(0)
-        
+
         val mainProb = (70..95).random() / 100f
         probs[selectedIdx] = mainProb
-        
+
         var remaining = 1.0f - mainProb
         val otherIndices = probs.indices.filter { it != selectedIdx }.shuffled()
         for (i in otherIndices.indices) {
@@ -274,7 +294,7 @@ class CornAIModel(private val context: Context) {
                 remaining -= p
             }
         }
-        
+
         return allKeys.mapIndexed { index, className ->
             val diseaseInfo = DiseaseData.getDiseaseInfo(className)
             ClassificationResult(
@@ -313,11 +333,13 @@ class CornAIModel(private val context: Context) {
         )
     }
 
-    fun isModelLoaded(): Boolean = interpreter != null
+    fun isModelLoaded(): Boolean = daunInterpreter != null && tongkolInterpreter != null
 
     fun close() {
-        interpreter?.close()
-        interpreter = null
+        daunInterpreter?.close()
+        tongkolInterpreter?.close()
+        daunInterpreter = null
+        tongkolInterpreter = null
     }
 
     fun getInputSize(): Int = INPUT_SIZE

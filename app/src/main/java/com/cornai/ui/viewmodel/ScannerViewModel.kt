@@ -83,7 +83,7 @@ class ScannerViewModel(application: Application) : AndroidViewModel(application)
                         val singleResult = aiModel.classify(bitmap, currentMode)
                         android.util.Log.d("ScannerViewModel", "Live Scan ($currentMode) - Prediksi: ${singleResult.className}, Confidence: ${singleResult.confidence}")
                         
-                        val allResults = aiModel.classifyAllClasses(bitmap)
+                        val allResults = aiModel.classifyAllClasses(bitmap, currentMode)
                         _allPredictions.value = allResults
                         
                         if (singleResult.confidence >= 0.40f) {
@@ -145,7 +145,7 @@ class ScannerViewModel(application: Application) : AndroidViewModel(application)
                         val singleResult = aiModel.classify(bitmap, currentMode)
                         android.util.Log.d("ScannerViewModel", "Gallery/Manual ($currentMode) - Prediksi: ${singleResult.className}, Confidence: ${singleResult.confidence}")
                         
-                        val allResults = aiModel.classifyAllClasses(bitmap)
+                        val allResults = aiModel.classifyAllClasses(bitmap, currentMode)
                         _allPredictions.value = allResults
                         
                         if (singleResult.confidence >= 0.40f) {
