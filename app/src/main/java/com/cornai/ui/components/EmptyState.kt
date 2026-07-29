@@ -1,3 +1,6 @@
+// Komponen UI reusable untuk aplikasi.
+// File: java\com\cornai\ui\components\EmptyState.kt
+
 package com.cornai.ui.components
 
 import androidx.compose.foundation.layout.*

@@ -1,3 +1,6 @@
+// Struct hasil operasi dengan status Loading, Success, atau Error.
+// File: java\com\cornai\data\model\Result.kt
+
 package com.cornai.data.model
 
 sealed class Result<out T> {

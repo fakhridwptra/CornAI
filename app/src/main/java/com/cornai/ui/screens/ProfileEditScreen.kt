@@ -1,3 +1,6 @@
+// Composable UI untuk satu halaman tampilan aplikasi.
+// File: java\com\cornai\ui\screens\ProfileEditScreen.kt
+
 package com.cornai.ui.screens
 
 import androidx.compose.foundation.background

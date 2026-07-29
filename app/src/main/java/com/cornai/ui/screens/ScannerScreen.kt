@@ -1,3 +1,6 @@
+// Composable UI untuk satu halaman tampilan aplikasi.
+// File: java\com\cornai\ui\screens\ScannerScreen.kt
+
 package com.cornai.ui.screens
 
 import android.Manifest

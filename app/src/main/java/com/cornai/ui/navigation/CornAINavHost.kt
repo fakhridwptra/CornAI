@@ -1,3 +1,6 @@
+// File Kotlin aplikasi CornAI.
+// File: java\com\cornai\ui\navigation\CornAINavHost.kt
+
 package com.cornai.ui.navigation
 
 import androidx.compose.animation.*

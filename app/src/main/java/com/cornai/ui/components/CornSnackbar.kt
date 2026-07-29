@@ -1,3 +1,6 @@
+// Komponen UI reusable untuk aplikasi.
+// File: java\com\cornai\ui\components\CornSnackbar.kt
+
 package com.cornai.ui.components
 
 import androidx.compose.animation.*

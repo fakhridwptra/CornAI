@@ -1,3 +1,6 @@
+// Model data histori scan hasil deteksi aplikasi.
+// File: java\com\cornai\data\model\ScanHistory.kt
+
 package com.cornai.data.model
 
 data class ScanHistory(

@@ -1,3 +1,6 @@
+// Model state UI untuk menangani tampilan aplikasi.
+// File: java\com\cornai\data\model\UiState.kt
+
 package com.cornai.data.model
 
 sealed class UiState<out T> {

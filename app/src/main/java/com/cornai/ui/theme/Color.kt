@@ -1,3 +1,6 @@
+// File Kotlin aplikasi CornAI.
+// File: java\com\cornai\ui\theme\Color.kt
+
 package com.cornai.ui.theme
 
 import androidx.compose.ui.graphics.Color

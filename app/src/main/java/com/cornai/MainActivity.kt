@@ -1,3 +1,6 @@
+// Activity utama aplikasi, lokasi start UI dan navigasi utama.
+// File: java\com\cornai\MainActivity.kt
+
 package com.cornai
 
 import android.os.Bundle

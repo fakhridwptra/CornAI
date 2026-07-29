@@ -1,3 +1,6 @@
+// Composable UI untuk satu halaman tampilan aplikasi.
+// File: java\com\cornai\ui\navigation\Screen.kt
+
 package com.cornai.ui.navigation
 
 sealed class Screen(val route: String) {

@@ -1,3 +1,6 @@
+// Layanan Firebase untuk autentikasi dan penyimpanan data.
+// File: java\com\cornai\data\remote\FirebaseService.kt
+
 package com.cornai.data.remote
 
 import com.cornai.data.model.ScanHistory

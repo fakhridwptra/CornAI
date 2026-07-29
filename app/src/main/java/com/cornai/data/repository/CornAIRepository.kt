@@ -1,3 +1,6 @@
+// Repository untuk mengelola akses data dan sumber yang digunakan.
+// File: java\com\cornai\data\repository\CornAIRepository.kt
+
 package com.cornai.data.repository
 
 import android.content.Context

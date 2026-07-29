@@ -1,3 +1,6 @@
+// Database lokal untuk menyimpan data secara offline.
+// File: java\com\cornai\data\local\CornAIDatabase.kt
+
 package com.cornai.data.local
 
 import android.content.Context

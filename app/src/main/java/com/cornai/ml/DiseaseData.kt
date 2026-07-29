@@ -1,5 +1,10 @@
+// Data statis informasi penyakit dan rekomendasi perawatan.
+// File: java\com\cornai\ml\DiseaseData.kt
+
 package com.cornai.ml
 
+// Objek penyimpanan data untuk informasi penyakit atau kondisi tanaman.
+// Setiap kelas penyakit memiliki nama tampilan, gejala, perawatan, dan pencegahan.
 object DiseaseData {
     data class DiseaseInfo(
         val className: String,
@@ -12,6 +17,7 @@ object DiseaseData {
         val recoveryTime: String
     )
 
+    // Daftar informasi untuk setiap kelas hasil klasifikasi.
     val diseaseInfoMap = mapOf(
         "Healthy_Daun" to DiseaseInfo(
             className = "Healthy_Daun",

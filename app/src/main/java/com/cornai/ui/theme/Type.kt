@@ -1,3 +1,6 @@
+// File Kotlin aplikasi CornAI.
+// File: java\com\cornai\ui\theme\Type.kt
+
 package com.cornai.ui.theme
 
 import androidx.compose.ui.text.TextStyle

@@ -1,3 +1,6 @@
+// Pengaturan tema, warna, dan gaya tampilan UI.
+// File: java\com\cornai\ui\theme\Theme.kt
+
 package com.cornai.ui.theme
 
 import android.app.Activity

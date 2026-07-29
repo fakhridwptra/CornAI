@@ -1,3 +1,6 @@
+// Komponen UI custom yang digunakan di banyak halaman.
+// File: java\com\cornai\ui\components\AdvancedComponents.kt
+
 package com.cornai.ui.components
 
 import androidx.compose.animation.*

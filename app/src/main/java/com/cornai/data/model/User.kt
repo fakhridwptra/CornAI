@@ -1,3 +1,6 @@
+// Model data pengguna aplikasi.
+// File: java\com\cornai\data\model\User.kt
+
 package com.cornai.data.model
 
 data class User(

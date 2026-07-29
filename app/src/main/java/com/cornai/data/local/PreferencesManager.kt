@@ -1,3 +1,6 @@
+// Menyimpan preferensi pengguna di penyimpanan lokal.
+// File: java\com\cornai\data\local\PreferencesManager.kt
+
 package com.cornai.data.local
 
 import android.content.Context

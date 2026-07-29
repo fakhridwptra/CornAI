@@ -1,3 +1,6 @@
+// Logika pemuatan model TFLite dan inferensi klasifikasi penyakit.
+// File: java\com\cornai\ml\CornAIModel.kt
+
 package com.cornai.ml
 
 import android.content.Context
@@ -7,6 +10,8 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kotlin.math.exp
 
+// Data class untuk menyimpan hasil klasifikasi yang dikembalikan ke UI.
+// Hasil ini berisi nama kelas, confidence, status sehat, gejala, perawatan, dan pencegahan.
 data class ClassificationResult(
     val className: String,
     val displayName: String,
@@ -19,6 +24,7 @@ data class ClassificationResult(
     val recoveryTime: String
 )
 
+// Kelas utama yang mengelola pemuatan model, inferensi, dan pengolahan hasil.
 class CornAIModel(private val context: Context) {
 
     private var daunInterpreter: Interpreter? = null
@@ -37,6 +43,8 @@ class CornAIModel(private val context: Context) {
         private const val INPUT_SIZE = 224
     }
 
+    // Memuat model TFLite dan label untuk kedua jenis input: daun dan tongkol.
+    // Mengembalikan true jika kedua model berhasil dimuat, false jika ada yang gagal.
     fun loadModel(): Boolean {
         android.util.Log.d("CornAIModel", "Mulai memuat dua model TFLite terpisah (Daun & Tongkol)...")
         var success = true
@@ -67,6 +75,8 @@ class CornAIModel(private val context: Context) {
         return success
     }
 
+    // Klasifikasi citra yang diterima dari kamera atau galeri.
+    // Mode "daun" memakai model daun, mode "tongkol" memakai model tongkol.
     fun classify(bitmap: android.graphics.Bitmap, mode: String = "daun"): ClassificationResult {
         val currentInterpreter = if (mode == "tongkol") tongkolInterpreter else daunInterpreter
         val currentLabels = if (mode == "tongkol") tongkolLabels else daunLabels
@@ -74,10 +84,13 @@ class CornAIModel(private val context: Context) {
         return if (currentInterpreter != null) {
             classifyWithModel(bitmap, currentInterpreter, currentLabels, mode)
         } else {
+            // Jika model belum tersedia, pakai hasil demo agar aplikasi tetap responsif.
             getDemoResult(mode)
         }
     }
 
+    // Lakukan inferensi dengan model TensorFlow Lite.
+    // Hasil output adalah skor untuk masing-masing kelas, lalu diproses kembali.
     private fun classifyWithModel(
         bitmap: android.graphics.Bitmap,
         interpreter: Interpreter,
@@ -91,12 +104,17 @@ class CornAIModel(private val context: Context) {
         try {
             interpreter.run(inputBuffer, outputBuffer)
         } catch (e: Exception) {
+            // Jika inferensi gagal, berikan hasil demo sebagai fallback.
             return getDemoResult(mode)
         }
 
         return postprocessOutput(outputBuffer[0], labels)
     }
 
+    // Ubah bitmap gambar menjadi format ByteBuffer yang dapat diproses oleh model.
+    // 1. Resize gambar ke ukuran yang dibutuhkan model.
+    // 2. Pisahkan pixel RGB.
+    // 3. Normalisasi nilai warna ke rentang 0..1.
     private fun preprocessBitmap(bitmap: android.graphics.Bitmap): ByteBuffer {
         val scaledBitmap = android.graphics.Bitmap.createScaledBitmap(bitmap, INPUT_SIZE, INPUT_SIZE, true)
 
@@ -123,6 +141,8 @@ class CornAIModel(private val context: Context) {
         return byteBuffer
     }
 
+    // Softmax mengubah skor mentah menjadi nilai probabilitas.
+    // Jika output sudah mendekati distribusi probabilitas, fungsi ini mengembalikan output asli.
     private fun applySoftmax(output: FloatArray): FloatArray {
         val sum = output.sum()
         val allInLogicalRange = output.all { it in 0.0f..1.0f }

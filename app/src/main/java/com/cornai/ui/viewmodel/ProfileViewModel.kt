@@ -1,3 +1,6 @@
+// ViewModel yang mengatur state UI dan interaksi dengan data.
+// File: java\com\cornai\ui\viewmodel\ProfileViewModel.kt
+
 package com.cornai.ui.viewmodel
 
 import android.app.Application
